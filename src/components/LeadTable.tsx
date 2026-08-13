@@ -51,28 +51,60 @@ export const LeadTable: React.FC<LeadTableProps> = ({
   const [sortField, setSortField] = useState<keyof Lead>('updatedAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [leadToDelete, setLeadToDelete] = useState<Lead | null>(null);
-  const [duplicateCheckResult, setDuplicateCheckResult] = useState<{ nomorWA: string; leads: Lead[] }[] | null>(null);
+  const [duplicateCheckResult, setDuplicateCheckResult] = useState<{ type: 'nomorWA' | 'namaCustomer'; key: string; leads: Lead[] }[] | null>(null);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
 
   const handleCheckDuplicates = () => {
     // Group leads by nomorWA
-    const groups: { [key: string]: Lead[] } = {};
+    const waGroups: { [key: string]: Lead[] } = {};
+    const nameGroups: { [key: string]: Lead[] } = {};
+
     leads.forEach((l) => {
+      // 1. WhatsApp Number Grouping
       const cleanWA = l.nomorWA?.trim() || '';
-      if (!cleanWA) return;
-      if (!groups[cleanWA]) {
-        groups[cleanWA] = [];
+      if (cleanWA) {
+        if (!waGroups[cleanWA]) {
+          waGroups[cleanWA] = [];
+        }
+        waGroups[cleanWA].push(l);
       }
-      groups[cleanWA].push(l);
+
+      // 2. Customer Name Grouping
+      const cleanName = l.namaCustomer?.trim() || '';
+      if (cleanName) {
+        const nameLower = cleanName.toLowerCase();
+        if (!nameGroups[nameLower]) {
+          nameGroups[nameLower] = [];
+        }
+        nameGroups[nameLower].push(l);
+      }
     });
 
-    // Filter groups that have more than 1 lead
-    const duplicates = Object.keys(groups)
-      .filter((wa) => groups[wa].length > 1)
-      .map((wa) => ({
-        nomorWA: wa,
-        leads: groups[wa],
-      }));
+    const duplicates: { type: 'nomorWA' | 'namaCustomer'; key: string; leads: Lead[] }[] = [];
+
+    // Filter WhatsApp duplicates
+    Object.keys(waGroups).forEach((wa) => {
+      if (waGroups[wa].length > 1) {
+        duplicates.push({
+          type: 'nomorWA',
+          key: wa,
+          leads: waGroups[wa],
+        });
+      }
+    });
+
+    // Filter Customer Name duplicates
+    Object.keys(nameGroups).forEach((nameLower) => {
+      if (nameGroups[nameLower].length > 1) {
+        // Find the actual case-sensitive name of the first item to display nicely
+        const originalName = nameGroups[nameLower][0].namaCustomer || nameLower;
+        duplicates.push({
+          type: 'namaCustomer',
+          key: originalName,
+          leads: nameGroups[nameLower],
+        });
+      }
+    });
 
     setDuplicateCheckResult(duplicates);
     setShowDuplicateModal(true);
@@ -516,8 +548,8 @@ export const LeadTable: React.FC<LeadTableProps> = ({
               <div className="flex items-center gap-2.5 text-amber-700">
                 <AlertTriangle className="w-5.5 h-5.5 text-amber-600" />
                 <div>
-                  <h3 className="text-base font-bold text-slate-800">🔍 Hasil Cek Duplikasi WhatsApp</h3>
-                  <p className="text-[11px] text-slate-500">Mencari nomor WhatsApp yang terdaftar lebih dari satu kali</p>
+                  <h3 className="text-base font-bold text-slate-800">🔍 Hasil Cek Duplikasi Data</h3>
+                  <p className="text-[11px] text-slate-500">Mencari nomor WhatsApp atau nama Customer yang terdaftar ganda</p>
                 </div>
               </div>
               <button
@@ -536,21 +568,28 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                 <div className="py-10 text-center space-y-2">
                   <div className="mx-auto w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-sm">✓</div>
                   <p className="text-xs font-bold text-slate-700">Selamat! Tidak ditemukan data dobel.</p>
-                  <p className="text-[11px] text-slate-400">Semua nomor WhatsApp di list dashboard ini unik.</p>
+                  <p className="text-[11px] text-slate-400">Semua nomor WhatsApp & nama Customer di list dashboard ini unik.</p>
                 </div>
               ) : (
                 <>
                   <div className="p-2.5 bg-amber-50 text-amber-800 text-[11px] rounded-lg border border-amber-100 font-semibold">
-                    ⚠️ Terdeteksi {duplicateCheckResult.length} nomor WhatsApp yang terduplikat. Anda dapat menghapus entri cadangan/salah di bawah ini:
+                    ⚠️ Terdeteksi {duplicateCheckResult.length} kelompok data ganda (berdasarkan nomor WA atau nama Customer). Anda dapat menghapus entri cadangan/salah di bawah ini:
                   </div>
 
                   <div className="space-y-3">
-                    {duplicateCheckResult.map((group) => (
-                      <div key={group.nomorWA} className="border border-slate-200 rounded-lg overflow-hidden shadow-3xs">
+                    {duplicateCheckResult.map((group, idx) => (
+                      <div key={`${group.type}-${group.key}-${idx}`} className="border border-slate-200 rounded-lg overflow-hidden shadow-3xs">
                         <div className="bg-slate-50 px-3 py-2 border-b border-slate-200 flex items-center justify-between">
-                          <span className="font-mono font-bold text-slate-800 text-xs">
-                            No. WA: {group.nomorWA}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wide ${
+                              group.type === 'nomorWA' ? 'bg-indigo-100 text-indigo-800 border border-indigo-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                            }`}>
+                              {group.type === 'nomorWA' ? 'WhatsApp' : 'Nama Customer'}
+                            </span>
+                            <span className="font-mono font-bold text-slate-800 text-xs">
+                              {group.key}
+                            </span>
+                          </div>
                           <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">
                             {group.leads.length} Duplikat
                           </span>
@@ -562,6 +601,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                               <div className="space-y-1">
                                 <div className="flex items-center gap-2">
                                   <span className="font-bold text-slate-800">{l.namaCustomer}</span>
+                                  <span className="text-slate-400 text-[11px] font-medium font-mono">({l.nomorWA})</span>
                                   <span className="px-1.5 py-0.2 bg-slate-100 border border-slate-200 rounded text-[9px] text-slate-500 font-semibold">
                                     CS: {l.namaCS}
                                   </span>
