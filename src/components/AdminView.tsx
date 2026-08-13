@@ -54,6 +54,7 @@ interface AdminViewProps {
   onUpdateSupabaseConfig: (newConfig: SupabaseConfig) => void;
   onMigrateToSupabase: () => Promise<{ success: boolean; message: string }>;
   onClearSupabaseData?: () => Promise<{ success: boolean; message: string }>;
+  activeDashboardName?: string;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({
@@ -82,6 +83,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   onUpdateSupabaseConfig,
   onMigrateToSupabase,
   onClearSupabaseData,
+  activeDashboardName,
 }) => {
   // All client names list
   const allClientNames = useMemo(() => {
@@ -91,11 +93,18 @@ export const AdminView: React.FC<AdminViewProps> = ({
   }, [dashboards]);
 
   // Selected KPI Dashboard Client
-  const [selectedKPIClient, setSelectedKPIClient] = useState<string>('Wibu Sales (Utama)');
+  const [selectedKPIClient, setSelectedKPIClient] = useState<string>(activeDashboardName || 'Wibu Sales (Utama)');
 
   // Selected Product Database Dashboard Client
-  const [selectedProdDashboard, setSelectedProdDashboard] = useState<string>('Wibu Sales (Utama)');
+  const [selectedProdDashboard, setSelectedProdDashboard] = useState<string>(activeDashboardName || 'Wibu Sales (Utama)');
   const [newProductName, setNewProductName] = useState<string>('');
+
+  useEffect(() => {
+    if (activeDashboardName) {
+      setSelectedKPIClient(activeDashboardName);
+      setSelectedProdDashboard(activeDashboardName);
+    }
+  }, [activeDashboardName]);
 
   const currentProductList = getProductsForDashboard(productsMap, selectedProdDashboard);
 

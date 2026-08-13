@@ -519,7 +519,7 @@ export default function App() {
         .catch((err) => {
           console.error('Failed auto sync from URL params:', err);
         });
-    } else if (spreadsheetConfig.spreadsheetId && spreadsheetConfig.spreadsheetId.trim() && spreadsheetConfig.autoSync) {
+    } else if (spreadsheetConfig.spreadsheetId && spreadsheetConfig.spreadsheetId.trim() && spreadsheetConfig.autoSync && !supabaseConfig.enabled) {
       handleSyncFromGoogleSheets(spreadsheetConfig).catch((err) => {
         console.log('Initial Google Sheets sync skipped or unconfigured:', err);
       });
@@ -648,8 +648,27 @@ export default function App() {
 
       // Update Products Map if Data Produk tabs returned product lists
       if (syncResult.productsMap && Object.keys(syncResult.productsMap).length > 0) {
-        setProductsMap(syncResult.productsMap);
-        localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(syncResult.productsMap));
+        setProductsMap((prev) => {
+          const merged = { ...prev };
+          Object.keys(syncResult.productsMap).forEach((key) => {
+            const newList = syncResult.productsMap[key] || [];
+            if (!merged[key]) {
+              merged[key] = newList;
+            } else {
+              const existingList = merged[key];
+              const uniqueItems = [...existingList];
+              newList.forEach((item) => {
+                const trimmedItem = item.trim();
+                if (trimmedItem && !uniqueItems.some(x => x.trim().toLowerCase() === trimmedItem.toLowerCase())) {
+                  uniqueItems.push(trimmedItem);
+                }
+              });
+              merged[key] = uniqueItems;
+            }
+          });
+          localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(merged));
+          return merged;
+        });
       }
 
       if (fetchedLeadsPartial) {
@@ -1080,6 +1099,7 @@ export default function App() {
             onUpdateSupabaseConfig={handleUpdateSupabaseConfig}
             onMigrateToSupabase={handleMigrateToSupabase}
             onClearSupabaseData={handleClearSupabaseData}
+            activeDashboardName={activeDashboardName}
           />
         )}
       </main>
