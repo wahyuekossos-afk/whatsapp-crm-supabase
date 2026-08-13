@@ -471,27 +471,43 @@ export async function dbBulkSeed(data: {
   try {
     // 1. Seed dashboards
     if (data.dashboards.length > 0) {
-      const payload = data.dashboards.map(d => ({
-        id: d.id,
-        name: d.name,
-        description: d.description || '',
-        created_at: d.createdAt
-      }));
-      const { error } = await supabase.from('dashboards').upsert(payload);
-      if (error) throw new Error(`Dashboards seed failed: ${error.message}`);
+      const uniqueDashboards: { [id: string]: any } = {};
+      data.dashboards.forEach(d => {
+        if (d.id) {
+          uniqueDashboards[d.id] = {
+            id: d.id,
+            name: d.name,
+            description: d.description || '',
+            created_at: d.createdAt
+          };
+        }
+      });
+      const payload = Object.values(uniqueDashboards);
+      if (payload.length > 0) {
+        const { error } = await supabase.from('dashboards').upsert(payload);
+        if (error) throw new Error(`Dashboards seed failed: ${error.message}`);
+      }
     }
 
     // 2. Seed CS Users
     if (data.csList.length > 0) {
-      const payload = data.csList.map(cs => ({
-        id: cs.id,
-        nama: cs.nama,
-        role: cs.role,
-        avatar: cs.avatar,
-        client_name: cs.clientName || null
-      }));
-      const { error } = await supabase.from('cs_users').upsert(payload);
-      if (error) throw new Error(`CS Users seed failed: ${error.message}`);
+      const uniqueCS: { [id: string]: any } = {};
+      data.csList.forEach(cs => {
+        if (cs.id) {
+          uniqueCS[cs.id] = {
+            id: cs.id,
+            nama: cs.nama,
+            role: cs.role,
+            avatar: cs.avatar,
+            client_name: cs.clientName || null
+          };
+        }
+      });
+      const payload = Object.values(uniqueCS);
+      if (payload.length > 0) {
+        const { error } = await supabase.from('cs_users').upsert(payload);
+        if (error) throw new Error(`CS Users seed failed: ${error.message}`);
+      }
     }
 
     // 3. Seed KPI Targets
@@ -509,12 +525,24 @@ export async function dbBulkSeed(data: {
     // 4. Seed Products
     const prodKeys = Object.keys(data.productsMap);
     if (prodKeys.length > 0) {
-      const payload: any[] = [];
+      const uniqueProducts: { [key: string]: any } = {};
       prodKeys.forEach(clientName => {
-        data.productsMap[clientName].forEach(p => {
-          payload.push({ client_name: clientName, product_name: p });
-        });
+        const list = data.productsMap[clientName];
+        if (Array.isArray(list)) {
+          list.forEach(p => {
+            const cleanClient = String(clientName).trim();
+            const cleanProduct = String(p).trim();
+            if (cleanClient && cleanProduct) {
+              const uniqueKey = `${cleanClient}::${cleanProduct}`;
+              uniqueProducts[uniqueKey] = {
+                client_name: cleanClient,
+                product_name: cleanProduct
+              };
+            }
+          });
+        }
       });
+      const payload = Object.values(uniqueProducts);
       if (payload.length > 0) {
         const { error } = await supabase.from('products').upsert(payload, { onConflict: 'client_name,product_name' });
         if (error) throw new Error(`Products seed failed: ${error.message}`);
@@ -523,34 +551,42 @@ export async function dbBulkSeed(data: {
 
     // 5. Seed Leads (chunked to prevent HTTP size limits)
     if (data.leads.length > 0) {
-      const payload = data.leads.map(lead => ({
-        id: lead.id,
-        client_id: lead.clientId || null,
-        client_name: lead.clientName || null,
-        nama_cs: lead.namaCS,
-        nomor_wa: lead.nomorWA,
-        nama_customer: lead.namaCustomer,
-        kategori_flow: lead.kategoriFlow,
-        alasan_lost: lead.alasanLost || null,
-        tanggal_masuk: lead.tanggalMasuk,
-        jam_masuk: lead.jamMasuk,
-        jam_balas: lead.jamBalas,
-        lokasi_kota: lead.lokasiKota,
-        note_customer: lead.noteCustomer,
-        item_order: lead.itemOrder,
-        quantity_order: lead.quantityOrder,
-        total_invoice: lead.totalInvoice,
-        updated_at: lead.updatedAt || new Date().toISOString(),
-        history: lead.history,
-        riwayat_repeat_order: lead.riwayatRepeatOrder || null
-      }));
+      const uniqueLeads: { [id: string]: any } = {};
+      data.leads.forEach(lead => {
+        if (lead.id) {
+          uniqueLeads[lead.id] = {
+            id: lead.id,
+            client_id: lead.clientId || null,
+            client_name: lead.clientName || null,
+            nama_cs: lead.namaCS,
+            nomor_wa: lead.nomorWA,
+            nama_customer: lead.namaCustomer,
+            kategori_flow: lead.kategoriFlow,
+            alasan_lost: lead.alasanLost || null,
+            tanggal_masuk: lead.tanggalMasuk,
+            jam_masuk: lead.jamMasuk,
+            jam_balas: lead.jamBalas,
+            lokasi_kota: lead.lokasiKota,
+            note_customer: lead.noteCustomer,
+            item_order: lead.itemOrder,
+            quantity_order: lead.quantityOrder,
+            total_invoice: lead.totalInvoice,
+            updated_at: lead.updatedAt || new Date().toISOString(),
+            history: lead.history,
+            riwayat_repeat_order: lead.riwayatRepeatOrder || null
+          };
+        }
+      });
+      const payload = Object.values(uniqueLeads);
 
-      // Chunk size = 100
-      const chunkSize = 100;
-      for (let i = 0; i < payload.length; i += chunkSize) {
-        const chunk = payload.slice(i, i + chunkSize);
-        const { error } = await supabase.from('leads').upsert(chunk);
-        if (error) throw new Error(`Leads chunk seed failing at ${i}: ${error.message}`);
+      if (payload.length > 0) {
+        // Chunk size = 100
+        const chunkSize = 100;
+        for (let i = 0; i < payload.length; i += chunkSize) {
+          const chunk = payload.slice(i, i + chunkSize);
+          const { error } = await supabase.from('leads').upsert(chunk);
+          if (error) throw new Error(`Leads chunk seed failing at ${i}: ${error.message}`);
+        }
       }
     }
 
