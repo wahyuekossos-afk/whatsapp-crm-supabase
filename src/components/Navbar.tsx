@@ -30,6 +30,8 @@ interface NavbarProps {
   totalLeadsCount: number;
   linkedSpreadsheetName?: string;
   onSyncGoogleSheets?: () => void;
+  isSpreadsheetConnected?: boolean;
+  isSupabaseConnected?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -48,7 +50,22 @@ export const Navbar: React.FC<NavbarProps> = ({
   totalLeadsCount,
   linkedSpreadsheetName = 'Main_Sales_2024.xlsx',
   onSyncGoogleSheets,
+  isSpreadsheetConnected = false,
+  isSupabaseConnected = false,
 }) => {
+  const getStatusText = () => {
+    if (isSpreadsheetConnected && isSupabaseConnected) {
+      return 'Sheet & Supabase';
+    }
+    if (isSupabaseConnected) {
+      return 'database supabase';
+    }
+    if (isSpreadsheetConnected) {
+      return 'database sheet';
+    }
+    return 'database local';
+  };
+
   return (
     <header className="bg-white text-slate-800 border-b border-slate-200 sticky top-0 z-30 shadow-xs">
       {/* Top Banner */}
@@ -65,19 +82,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <h1 className="text-base font-bold tracking-tight text-slate-800">
                   WA-CRM <span className="text-slate-400 font-normal">| Sales Monitor &amp; Tracker</span>
                 </h1>
-                <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                  Linked to: <span className="text-slate-800 font-semibold">{linkedSpreadsheetName}</span>
-                  {onSyncGoogleSheets && (
-                    <button
-                      onClick={onSyncGoogleSheets}
-                      className="ml-1 px-1.5 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[10px] cursor-pointer transition-all flex items-center gap-1"
-                      title="Tarik data terbaru dari Google Sheets"
-                    >
-                      <RefreshCw className="w-2.5 h-2.5" />
-                      <span>Sync</span>
-                    </button>
-                  )}
+                <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shadow-3xs">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse animate-duration-1000"></div>
+                  Linked to: <span className="text-slate-800 font-extrabold">{getStatusText()}</span>
                 </div>
               </div>
               <p className="text-[11px] text-slate-500 font-medium hidden md:block">

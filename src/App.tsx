@@ -1004,6 +1004,8 @@ export default function App() {
         totalLeadsCount={dashboardBelongingLeads.length}
         linkedSpreadsheetName={spreadsheetConfig.fileName}
         onSyncGoogleSheets={() => handleSyncFromGoogleSheets()}
+        isSpreadsheetConnected={!!(spreadsheetConfig.spreadsheetId && spreadsheetConfig.spreadsheetId.trim() !== '')}
+        isSupabaseConnected={supabaseConfig.enabled}
       />
 
       {/* Main Content Area */}
