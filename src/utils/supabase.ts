@@ -689,6 +689,20 @@ ALTER TABLE spreadsheet_config DISABLE ROW LEVEL SECURITY;
 `;
 
 // Clear all tables in connected Supabase
+export async function dbGetDatabaseSize(): Promise<number | null> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase.rpc('get_db_size');
+    if (!error && data !== null && data !== undefined) {
+      return Number(data); // size in bytes
+    }
+  } catch (e) {
+    console.log('Using local fallback for database size estimation');
+  }
+  return null;
+}
+
 export async function dbClearAllSupabaseData(): Promise<{ success: boolean; message: string }> {
   const supabase = getSupabaseClient();
   if (!supabase) {

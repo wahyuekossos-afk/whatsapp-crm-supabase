@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CSUser, Lead, SpreadsheetConfig, DashboardClient, KPITargets, KPITargetsMap, ProductsMap } from '../types';
 import { getProductsForDashboard } from '../utils/spreadsheet';
-import { SupabaseConfig, testSupabaseConnection, SUPABASE_SQL_SCRIPT } from '../utils/supabase';
+import { SupabaseConfig, testSupabaseConnection, SUPABASE_SQL_SCRIPT, dbGetDatabaseSize } from '../utils/supabase';
 import {
   Users,
   UserPlus,
@@ -25,7 +25,8 @@ import {
   Share2,
   Target,
   Package,
-  Plus
+  Plus,
+  HardDrive
 } from 'lucide-react';
 
 interface AdminViewProps {
@@ -189,6 +190,65 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [isDeletingSupabase, setIsDeletingSupabase] = useState(false);
   const [showSupabaseClearConfirmModal, setShowSupabaseClearConfirmModal] = useState(false);
   const [connectionTestStatus, setConnectionTestStatus] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Storage usage states
+  const [supabaseRealSize, setSupabaseRealSize] = useState<number | null>(null);
+  const [isFetchingSize, setIsFetchingSize] = useState(false);
+
+  useEffect(() => {
+    const fetchSize = async () => {
+      if (localSupabaseConfig.enabled && localSupabaseConfig.url && localSupabaseConfig.anonKey) {
+        setIsFetchingSize(true);
+        try {
+          const bytes = await dbGetDatabaseSize();
+          if (bytes !== null) {
+            setSupabaseRealSize(bytes);
+          }
+        } catch (err) {
+          console.log('Error fetching physical DB size:', err);
+        } finally {
+          setIsFetchingSize(false);
+        }
+      } else {
+        setSupabaseRealSize(null);
+      }
+    };
+    fetchSize();
+  }, [localSupabaseConfig.enabled, localSupabaseConfig.url, localSupabaseConfig.anonKey, leads, csList, productsMap]);
+
+  const estimatedBytes = useMemo(() => {
+    // Basic overhead: 120 KB (Database core schemas & tables definition)
+    const overhead = 120 * 1024;
+    // Leads size: average 1.2 KB per lead row
+    const leadsSize = (leads || []).length * 1228;
+    // CS size: average 0.5 KB per CS
+    const csSize = (csList || []).length * 512;
+    // Products size: average 0.5 KB per product
+    let productsCount = 0;
+    if (productsMap) {
+      Object.keys(productsMap).forEach((key) => {
+        productsCount += (productsMap[key] || []).length;
+      });
+    }
+    const productsSize = productsCount * 512;
+    // Dashboards size: average 1 KB per dashboard
+    const dashboardsCount = dashboards ? dashboards.length : 0;
+    const dashboardsSize = dashboardsCount * 1024;
+
+    return overhead + leadsSize + csSize + productsSize + dashboardsSize;
+  }, [leads, csList, productsMap, dashboards]);
+
+  const activeBytes = supabaseRealSize !== null ? supabaseRealSize : estimatedBytes;
+  // Supabase Free Tier limit: 500 MB (500 * 1024 * 1024 Bytes)
+  const LIMIT_BYTES = 500 * 1024 * 1024;
+  const usagePercentage = Math.min(100, Math.max(0.01, (activeBytes / LIMIT_BYTES) * 100));
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    const kb = bytes / 1024;
+    if (kb < 1024) return `${kb.toFixed(2)} KB`;
+    return `${(kb / 1024).toFixed(2)} MB`;
+  };
 
   // Sync state if supabaseConfig changed from parent
   useEffect(() => {
@@ -1520,6 +1580,66 @@ function doPost(e) {
                   </button>
                 )}
               </div>
+
+              {/* Database Storage Meter for Supabase Free Tier */}
+              {localSupabaseConfig.enabled && (
+                <div className="p-3 bg-indigo-50/40 border border-indigo-100 rounded-lg space-y-2 mt-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-bold text-slate-700 flex items-center gap-1">
+                      <HardDrive className="w-3.5 h-3.5 text-indigo-600" />
+                      Status Penyimpanan (Supabase Free)
+                    </span>
+                    <span className="font-extrabold text-indigo-950 font-mono">
+                      {usagePercentage.toFixed(4)}%
+                    </span>
+                  </div>
+
+                  {/* Progress Bar Container */}
+                  <div className="w-full h-2.5 bg-slate-200/80 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-500 rounded-full ${
+                        usagePercentage > 90 ? 'bg-red-500' : usagePercentage > 75 ? 'bg-amber-500' : 'bg-indigo-600'
+                      }`}
+                      style={{ width: `${usagePercentage}%` }}
+                    />
+                  </div>
+
+                  {/* Info details */}
+                  <div className="flex justify-between items-center text-[10px] text-slate-500 font-semibold">
+                    <span>Terpakai: <strong className="text-indigo-900">{formatSize(activeBytes)}</strong></span>
+                    <span>Batas Free Tier: <strong className="text-slate-700">500 MB</strong></span>
+                  </div>
+
+                  <div className="text-[9px] text-slate-400 bg-white/80 p-1.5 rounded border border-indigo-50/80 leading-relaxed font-medium">
+                    {supabaseRealSize !== null ? (
+                      <span className="text-emerald-700 font-bold flex items-center gap-0.5">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                        Ukuran fisik database presisi terbaca secara real-time.
+                      </span>
+                    ) : (
+                      <div className="space-y-1">
+                        <span>
+                          💡 Menampilkan estimasi ukuran data CRM Anda. Ingin membaca ukuran fisik PostgreSQL secara presisi?
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const sqlHelper = `CREATE OR REPLACE FUNCTION get_db_size()
+RETURNS bigint AS $$
+  SELECT pg_database_size(current_database());
+$$ LANGUAGE sql SECURITY DEFINER;`;
+                            navigator.clipboard.writeText(sqlHelper);
+                            onShowToast('📋 Kode SQL Helper disalin! Jalankan di SQL Editor Supabase Anda.');
+                          }}
+                          className="block text-indigo-600 hover:underline font-extrabold cursor-pointer"
+                        >
+                          👉 Klik disini untuk menyalin SQL Helper Fungsi Size
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* SQL setup copy helper */}
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
