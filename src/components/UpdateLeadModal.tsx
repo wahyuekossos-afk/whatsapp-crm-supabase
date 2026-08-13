@@ -32,6 +32,7 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
 
   const [kategoriFlow, setKategoriFlow] = useState<FlowCategory>(lead.kategoriFlow);
   const [namaCustomer, setNamaCustomer] = useState(lead.namaCustomer || '');
+  const [nomorWA, setNomorWA] = useState(lead.nomorWA || '');
   const [alasanLost, setAlasanLost] = useState<LostReason | string>(lead.alasanLost || '');
   const [jamBalas, setJamBalas] = useState(lead.jamBalas || '');
   const [lokasiKota, setLokasiKota] = useState(lead.lokasiKota || '');
@@ -59,6 +60,7 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
     if (lead) {
       setKategoriFlow(lead.kategoriFlow);
       setNamaCustomer(lead.namaCustomer || '');
+      setNomorWA(lead.nomorWA || '');
       setAlasanLost(lead.alasanLost || '');
       setJamBalas(lead.jamBalas || '');
       setLokasiKota(lead.lokasiKota || '');
@@ -165,6 +167,10 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
     e.preventDefault();
     setErrorMsg('');
 
+    if (!nomorWA.trim()) {
+      return setErrorMsg('VALIDASI: Nomor WhatsApp wajib diisi!');
+    }
+
     // Specific validation rule: If kategori == "Lost", Alasan Lost is MANDATORY
     if (kategoriFlow === 'Lost' && !alasanLost.trim()) {
       return setErrorMsg('VALIDASI KHUSUS: Alasan Lost WAJIB diisi jika kategori = "Lost"!');
@@ -251,6 +257,7 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
     const updatedLead: Lead = {
       ...lead, // Preserves other fields
       namaCustomer,
+      nomorWA: nomorWA.trim(),
       kategoriFlow,
       alasanLost: kategoriFlow === 'Lost' ? alasanLost : '',
       jamBalas,
@@ -339,7 +346,7 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
           {/* Scrollable Form Content */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5 text-xs text-slate-800">
             
-            {/* Locked / Read-Only Header (No Need to Re-Input) */}
+             {/* Locked / Read-Only Header (No Need to Re-Input) */}
             <div className="p-2.5 sm:p-3 bg-slate-100/90 border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
               <div>
                 <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
@@ -356,17 +363,24 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
               </div>
 
               <div>
-                <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                  <Lock className="w-3 h-3 text-slate-400 shrink-0" /> No. WhatsApp
+                <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
+                  ✏️ No. WhatsApp <span className="text-rose-500 font-bold">*</span>
                 </span>
-                <p className="font-mono font-bold text-emerald-700 text-xs mt-0.5">{lead.nomorWA}</p>
+                <input
+                  type="text"
+                  value={nomorWA}
+                  onChange={(e) => setNomorWA(e.target.value)}
+                  placeholder="No. WhatsApp..."
+                  className="w-full px-2 py-1 text-xs bg-white border border-slate-300 rounded-md font-mono font-bold text-emerald-700 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  required
+                />
               </div>
 
               <div>
                 <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                   <Lock className="w-3 h-3 text-slate-400 shrink-0" /> Tanggal Masuk
                 </span>
-                <p className="font-semibold text-slate-700 text-xs mt-0.5">{lead.tanggalMasuk}</p>
+                <p className="font-semibold text-slate-700 text-xs mt-1.5">{lead.tanggalMasuk}</p>
               </div>
             </div>
 
@@ -423,7 +437,7 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
             {/* Time & Location Update */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Jam Balas CS Terakhir</label>
+                <label className="block font-bold text-slate-700 mb-1">Jam</label>
                 <input
                   type="time"
                   value={jamBalas}
