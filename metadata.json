@@ -1,0 +1,6 @@
+{
+  "name": "CRM WhatsApp Sales & Tracking Spreadsheet",
+  "description": "Sistem CRM Sales WhatsApp untuk tracking leads CS, update status flow, validasi lost, sync spreadsheet Excel/CSV, dan dashboard monitoring performa sales.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
