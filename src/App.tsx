@@ -23,6 +23,7 @@ import {
   dbGetSpreadsheetConfig,
   dbUpsertSpreadsheetConfig,
   dbBulkSeed,
+  dbClearAllSupabaseData,
   SupabaseConfig
 } from './utils/supabase';
 import { Navbar } from './components/Navbar';
@@ -177,6 +178,11 @@ export default function App() {
       productsMap,
       spreadsheetConfig
     });
+    return res;
+  };
+
+  const handleClearSupabaseData = async () => {
+    const res = await dbClearAllSupabaseData();
     return res;
   };
 
@@ -1073,6 +1079,7 @@ export default function App() {
             supabaseConfig={supabaseConfig}
             onUpdateSupabaseConfig={handleUpdateSupabaseConfig}
             onMigrateToSupabase={handleMigrateToSupabase}
+            onClearSupabaseData={handleClearSupabaseData}
           />
         )}
       </main>

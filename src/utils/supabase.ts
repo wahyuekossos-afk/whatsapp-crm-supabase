@@ -687,3 +687,41 @@ ALTER TABLE kpi_targets DISABLE ROW LEVEL SECURITY;
 ALTER TABLE products DISABLE ROW LEVEL SECURITY;
 ALTER TABLE spreadsheet_config DISABLE ROW LEVEL SECURITY;
 `;
+
+// Clear all tables in connected Supabase
+export async function dbClearAllSupabaseData(): Promise<{ success: boolean; message: string }> {
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    return { success: false, message: 'Supabase client belum diinisialisasi atau dinonaktifkan.' };
+  }
+
+  try {
+    // 1. Delete leads
+    const { error: errLeads } = await supabase.from('leads').delete().neq('id', '_dummy_key_');
+    if (errLeads) throw new Error(`Leads: ${errLeads.message}`);
+
+    // 2. Delete products
+    const { error: errProducts } = await supabase.from('products').delete().gt('id', 0);
+    if (errProducts) throw new Error(`Products: ${errProducts.message}`);
+
+    // 3. Delete kpi_targets
+    const { error: errKPI } = await supabase.from('kpi_targets').delete().neq('client_name', '_dummy_key_');
+    if (errKPI) throw new Error(`KPI Targets: ${errKPI.message}`);
+
+    // 4. Delete cs_users
+    const { error: errCS } = await supabase.from('cs_users').delete().neq('id', '_dummy_key_');
+    if (errCS) throw new Error(`CS Users: ${errCS.message}`);
+
+    // 5. Delete dashboards
+    const { error: errDash } = await supabase.from('dashboards').delete().neq('id', '_dummy_key_');
+    if (errDash) throw new Error(`Dashboards: ${errDash.message}`);
+
+    // 6. Delete spreadsheet_config
+    const { error: errConfig } = await supabase.from('spreadsheet_config').delete().neq('id', '_dummy_key_');
+    if (errConfig) throw new Error(`Spreadsheet Config: ${errConfig.message}`);
+
+    return { success: true, message: 'Seluruh database di Supabase berhasil dikosongkan!' };
+  } catch (err: any) {
+    return { success: false, message: `Gagal menghapus data di Supabase: ${err.message || err}` };
+  }
+}

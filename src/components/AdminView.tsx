@@ -53,6 +53,7 @@ interface AdminViewProps {
   supabaseConfig: SupabaseConfig;
   onUpdateSupabaseConfig: (newConfig: SupabaseConfig) => void;
   onMigrateToSupabase: () => Promise<{ success: boolean; message: string }>;
+  onClearSupabaseData?: () => Promise<{ success: boolean; message: string }>;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({
@@ -80,6 +81,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   supabaseConfig,
   onUpdateSupabaseConfig,
   onMigrateToSupabase,
+  onClearSupabaseData,
 }) => {
   // All client names list
   const allClientNames = useMemo(() => {
@@ -175,6 +177,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [localSupabaseConfig, setLocalSupabaseConfig] = useState<SupabaseConfig>({ ...supabaseConfig });
   const [isTestingSupabase, setIsTestingSupabase] = useState(false);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [isDeletingSupabase, setIsDeletingSupabase] = useState(false);
+  const [showSupabaseClearConfirmModal, setShowSupabaseClearConfirmModal] = useState(false);
   const [connectionTestStatus, setConnectionTestStatus] = useState<{ success: boolean; message: string } | null>(null);
 
   // Sync state if supabaseConfig changed from parent
@@ -222,6 +226,24 @@ export const AdminView: React.FC<AdminViewProps> = ({
       onShowToast(`❌ Gagal migrasi: ${e?.message || String(e)}`);
     } finally {
       setIsMigrating(false);
+    }
+  };
+
+  const handleClearSupabaseData = async () => {
+    if (!onClearSupabaseData) return;
+    setIsDeletingSupabase(true);
+    setShowSupabaseClearConfirmModal(false);
+    try {
+      const res = await onClearSupabaseData();
+      if (res.success) {
+        onShowToast(`🧹 ${res.message}`);
+      } else {
+        onShowToast(`❌ ${res.message}`);
+      }
+    } catch (e: any) {
+      onShowToast(`❌ Gagal mengosongkan Supabase: ${e?.message || String(e)}`);
+    } finally {
+      setIsDeletingSupabase(false);
     }
   };
 
@@ -1452,7 +1474,7 @@ function doPost(e) {
                 <button
                   type="button"
                   onClick={handleMigrateData}
-                  disabled={isMigrating}
+                  disabled={isMigrating || isDeletingSupabase}
                   className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold rounded flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
                 >
                   {isMigrating ? (
@@ -1467,6 +1489,27 @@ function doPost(e) {
                     </>
                   )}
                 </button>
+
+                {onClearSupabaseData && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSupabaseClearConfirmModal(true)}
+                    disabled={isMigrating || isDeletingSupabase}
+                    className="w-full py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[11px] font-bold rounded flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    {isDeletingSupabase ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Sedang Menghapus Data...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                        <span>🧹 Kosongkan Database Supabase</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
 
               {/* SQL setup copy helper */}
@@ -1635,6 +1678,56 @@ function doPost(e) {
                 className="px-4 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded transition-all cursor-pointer shadow-xs"
               >
                 Ya, Kosongkan Sekarang
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Modal for Clear Supabase Database */}
+      {showSupabaseClearConfirmModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl border border-red-100 space-y-4">
+            <div className="flex items-center gap-3 text-red-600">
+              <div className="p-2.5 bg-red-100 rounded-lg">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-800">⚠️ Hapus Cloud Database Supabase</h3>
+                <p className="text-xs text-red-600 font-semibold">Tindakan ini sangat berbahaya & permanen!</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Apakah Anda yakin ingin menghapus seluruh data yang tersimpan di cloud database Supabase Anda? Tindakan ini akan mengosongkan semua tabel berikut di Supabase:
+            </p>
+            <ul className="text-xs text-slate-500 list-disc list-inside space-y-1 font-medium bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+              <li>Tabel Leads (Semua Log Prospek)</li>
+              <li>Tabel Products (Daftar Produk)</li>
+              <li>Tabel KPI Targets (Target Konversi & Response Time)</li>
+              <li>Tabel CS Users (Daftar Akun Petugas CS)</li>
+              <li>Tabel Dashboards (Pengaturan Klien)</li>
+              <li>Tabel Spreadsheet Config (Konfigurasi Google Sheets)</li>
+            </ul>
+
+            <p className="text-[10px] text-amber-700 bg-amber-50 p-2 rounded border border-amber-150 font-medium">
+              💡 Tips: Gunakan ini jika data Anda berantakan/terduplikat dan ingin melakukan migrasi bersih ulang dari Google Sheets atau Local Storage.
+            </p>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowSupabaseClearConfirmModal(false)}
+                className="px-4 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded transition-all cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleClearSupabaseData}
+                className="px-4 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded transition-all cursor-pointer shadow-xs"
+              >
+                Ya, Hapus Bersih Supabase
               </button>
             </div>
           </div>
