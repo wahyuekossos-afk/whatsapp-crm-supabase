@@ -10,7 +10,8 @@ import {
   Award,
   ShieldCheck,
   Plus,
-  FolderKanban
+  FolderKanban,
+  Globe
 } from 'lucide-react';
 import { CSUser, DashboardClient } from '../types';
 
@@ -219,6 +220,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               <ShieldCheck className="w-3.5 h-3.5 text-green-600" />
               <span>Admin Management</span>
             </button>
+
+            <a
+              href="https://report-ads-eight.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              referrerPolicy="no-referrer"
+              className="flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded transition-all cursor-pointer text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+            >
+              <Globe className="w-3.5 h-3.5 text-green-600" />
+              <span>Meta</span>
+            </a>
           </div>
 
           {/* Excel Export & Tools */}
