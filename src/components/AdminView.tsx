@@ -205,27 +205,50 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [metaDate, setMetaDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [metaCSName, setMetaCSName] = useState<string>('');
   const [metaChatCount, setMetaChatCount] = useState<string>('');
+  const [metaKondisi, setMetaKondisi] = useState<string>('');
 
   const handleSaveMetaChat = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!metaDate || !metaCSName || !metaChatCount) {
-      onShowToast('⚠️ Harap isi semua kolom input data Meta Chat.');
+    if (!metaDate) {
+      onShowToast('⚠️ Harap pilih tanggal.');
       return;
     }
-    const count = parseInt(metaChatCount, 10);
-    if (isNaN(count) || count < 0) {
-      onShowToast('⚠️ Jumlah chat masuk harus angka positif.');
+
+    if (!metaCSName && !metaKondisi.trim()) {
+      onShowToast('⚠️ Harap pilih petugas CS atau isi kolom Kondisi terlebih dahulu.');
       return;
     }
+
+    let count = 0;
+    if (metaCSName) {
+      if (!metaChatCount) {
+        onShowToast('⚠️ Harap isi Jumlah Chat Masuk jika petugas CS dipilih.');
+        return;
+      }
+      count = parseInt(metaChatCount, 10);
+      if (isNaN(count) || count < 0) {
+        onShowToast('⚠️ Jumlah chat masuk harus angka positif.');
+        return;
+      }
+    }
+
     if (onUpsertMetaChat) {
       onUpsertMetaChat({
         id: `meta-${Date.now()}`,
         tanggal: metaDate,
-        namaCS: metaCSName,
+        namaCS: metaCSName, // can be empty string for general date conditions
         chatCount: count,
+        kondisi: metaKondisi.trim(),
       });
-      onShowToast(`✅ Berhasil menyimpan target Meta Chat untuk ${metaCSName} pada ${metaDate}: ${count} chats.`);
+
+      if (metaCSName) {
+        onShowToast(`✅ Berhasil menyimpan target Meta Chat untuk ${metaCSName} pada ${metaDate}: ${count} chats.`);
+      } else {
+        onShowToast(`✅ Berhasil menyimpan Kondisi Hari pada ${metaDate}: "${metaKondisi}".`);
+      }
+
       setMetaChatCount('');
+      setMetaKondisi('');
     }
   };
 
@@ -1013,15 +1036,14 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
               <div>
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                  Pilih Petugas CS <span className="text-red-500">*</span>
+                  Pilih Petugas CS <span className="text-slate-400 font-semibold">(Wajib jika input target chat)</span>
                 </label>
                 <select
                   value={metaCSName}
                   onChange={(e) => setMetaCSName(e.target.value)}
                   className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white cursor-pointer"
-                  required
                 >
-                  <option value="">-- Pilih CS --</option>
+                  <option value="">-- Pilih CS (Kosongkan jika hanya input Kondisi Hari) --</option>
                   {csList.map((cs) => (
                     <option key={cs.id} value={cs.nama}>
                       👤 {cs.nama} ({cs.clientName || 'Global'})
@@ -1032,7 +1054,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
               <div>
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                  Jumlah Chat Masuk (Meta) <span className="text-red-500">*</span>
+                  Jumlah Chat Masuk (Meta) <span className="text-slate-400 font-semibold">(Wajib jika petugas CS dipilih)</span>
                 </label>
                 <input
                   type="number"
@@ -1041,7 +1063,19 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   onChange={(e) => setMetaChatCount(e.target.value)}
                   placeholder="Contoh: 40"
                   className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
-                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Kondisi Hari <span className="text-slate-400 font-semibold">(Opsional - e.g. "Iklan Mati", "Libur")</span>
+                </label>
+                <input
+                  type="text"
+                  value={metaKondisi}
+                  onChange={(e) => setMetaKondisi(e.target.value)}
+                  placeholder="Contoh: Iklan mati atau Libur"
+                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
                 />
               </div>
 
@@ -1059,7 +1093,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
               <div className="pt-2 border-t border-slate-100">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[10px] font-bold text-slate-500 uppercase">
-                    Riwayat Input Meta Chat:
+                    Riwayat Input Meta Chat &amp; Kondisi:
                   </span>
                   <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded">
                     {metaChats.length} Data
@@ -1069,13 +1103,23 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 text-xs">
                   {metaChats.slice().sort((a, b) => b.tanggal.localeCompare(a.tanggal)).map((mc, idx) => (
                     <div
-                      key={`${mc.tanggal}-${mc.namaCS}-${idx}`}
+                      key={`${mc.tanggal}-${mc.namaCS || 'Kondisi'}-${idx}`}
                       className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded font-medium text-slate-800 hover:bg-emerald-50/50 transition-all"
                     >
                       <div className="flex flex-col">
-                        <span className="font-bold text-emerald-800">{mc.namaCS}</span>
+                        <span className="font-bold text-emerald-800">
+                          {mc.namaCS ? mc.namaCS : '📢 KONDISI HARI'}
+                        </span>
                         <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                          📅 {mc.tanggal} — <strong className="text-slate-700 font-extrabold">{mc.chatCount} Chats</strong>
+                          📅 {mc.tanggal}
+                          {mc.namaCS && (
+                            <> — <strong className="text-slate-700 font-extrabold">{mc.chatCount} Chats</strong></>
+                          )}
+                          {mc.kondisi && (
+                            <span className="ml-1.5 bg-amber-100 text-amber-800 font-bold px-1 py-0.5 rounded text-[9px]">
+                              📝 {mc.kondisi}
+                            </span>
+                          )}
                         </span>
                       </div>
                       {onDeleteMetaChat && (

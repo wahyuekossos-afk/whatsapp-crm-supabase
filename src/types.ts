@@ -119,6 +119,7 @@ export interface MetaChat {
   tanggal: string;
   namaCS: string;
   chatCount: number;
+  kondisi?: string;
 }
 
 

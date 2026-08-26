@@ -427,7 +427,8 @@ export async function dbGetMetaChats(): Promise<MetaChat[]> {
       id: String(item.id),
       tanggal: item.tanggal,
       namaCS: item.nama_cs,
-      chatCount: Number(item.chat_count || 0)
+      chatCount: Number(item.chat_count || 0),
+      kondisi: item.kondisi || ''
     }));
   } catch (e) {
     console.error('Error fetching Meta Chats from Supabase:', e);
@@ -444,7 +445,8 @@ export async function dbUpsertMetaChat(chat: MetaChat): Promise<void> {
       .upsert({
         tanggal: chat.tanggal,
         nama_cs: chat.namaCS,
-        chat_count: chat.chatCount
+        chat_count: chat.chatCount,
+        kondisi: chat.kondisi || ''
       }, { onConflict: 'tanggal,nama_cs' });
     if (error) throw error;
   } catch (e) {
@@ -746,6 +748,7 @@ CREATE TABLE IF NOT EXISTS meta_chats (
     tanggal TEXT NOT NULL,
     nama_cs TEXT NOT NULL,
     chat_count INTEGER DEFAULT 0,
+    kondisi TEXT DEFAULT '',
     UNIQUE(tanggal, nama_cs)
 );
 

@@ -174,10 +174,16 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
       // A date row is flagged as mismatch (red date) only if at least one CS is under performing (isUnder)
       const anyMismatch = csData.some((cd) => cd.isUnder);
 
+      // Extract general date condition or fallback to first CS condition on that date
+      const generalEntry = metaChats.find((m) => m.tanggal === date && !m.namaCS);
+      const anyCondEntry = metaChats.find((m) => m.tanggal === date && m.kondisi);
+      const kondisi = generalEntry?.kondisi || anyCondEntry?.kondisi || '';
+
       return {
         date,
         csData,
-        anyMismatch
+        anyMismatch,
+        kondisi
       };
     });
   }, [allDates, csList, leads, metaChats]);
@@ -496,19 +502,28 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
                       <tr key={row.date} className="hover:bg-slate-50/50 transition-colors">
                         {/* TANGGAL CELL: Colored red if mismatch occurs in this date */}
                         <td className="p-3.5 pl-5 font-bold text-xs">
-                          {row.anyMismatch ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="bg-red-500 hover:bg-red-600 text-white font-extrabold px-2.5 py-1 rounded shadow-xs flex items-center gap-1">
-                                <AlertTriangle className="w-3 h-3 text-white" />
-                                <span>{row.date}</span>
+                          <div className="flex flex-col gap-1.5 items-start">
+                            {row.anyMismatch ? (
+                              <div className="flex items-center gap-1.5">
+                                <span className="bg-red-500 hover:bg-red-600 text-white font-extrabold px-2.5 py-1 rounded shadow-xs flex items-center gap-1">
+                                  <AlertTriangle className="w-3 h-3 text-white" />
+                                  <span>{row.date}</span>
+                                </span>
+                                <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" title="Kesesuaian Bermasalah" />
+                              </div>
+                            ) : (
+                              <span className="bg-emerald-100 text-emerald-800 font-extrabold px-2.5 py-1 rounded inline-flex items-center gap-1">
+                                <span>📅 {row.date}</span>
                               </span>
-                              <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" title="Kesesuaian Bermasalah" />
-                            </div>
-                          ) : (
-                            <span className="bg-emerald-100 text-emerald-800 font-extrabold px-2.5 py-1 rounded">
-                              📅 {row.date}
-                            </span>
-                          )}
+                            )}
+
+                            {row.kondisi && (
+                              <div className="text-[10px] font-bold text-amber-900 bg-amber-50 border border-amber-200/80 rounded px-2 py-1 flex items-start gap-1 max-w-[170px] whitespace-normal break-words shadow-2xs">
+                                <span className="text-amber-500 mt-0.5">📝</span>
+                                <span>{row.kondisi}</span>
+                              </div>
+                            )}
+                          </div>
                         </td>
 
                         {/* CS CELLS */}
