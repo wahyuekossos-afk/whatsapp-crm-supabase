@@ -16,6 +16,9 @@ import {
   Database, 
   TrendingDown,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Info,
   Sparkles
 } from 'lucide-react';
 import { 
@@ -49,6 +52,7 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
   const [summarySearch, setSummarySearch] = useState('');
   const [summaryCSFilter, setSummaryCSFilter] = useState('');
   const [mismatchOnly, setMismatchOnly] = useState(false);
+  const [showCRMDetails, setShowCRMDetails] = useState(false);
 
   // --- LEADERBOARD LOGIC & CALCULATIONS ---
   const csStats = useMemo(() => {
@@ -239,6 +243,46 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
     return sum;
   }, [filteredSummary, summaryCSFilter]);
 
+  const exceedingDetails = useMemo(() => {
+    const list: { date: string; csName: string; csLeadCount: number; metaCount: number; difference: number }[] = [];
+    filteredSummary.forEach((row) => {
+      row.csData.forEach((cd) => {
+        if (cd.isExceeding) {
+          if (!summaryCSFilter || cd.csName === summaryCSFilter) {
+            list.push({
+              date: row.date,
+              csName: cd.csName,
+              csLeadCount: cd.csLeadCount,
+              metaCount: cd.metaCount,
+              difference: cd.difference
+            });
+          }
+        }
+      });
+    });
+    return list;
+  }, [filteredSummary, summaryCSFilter]);
+
+  const underDetails = useMemo(() => {
+    const list: { date: string; csName: string; csLeadCount: number; metaCount: number; difference: number }[] = [];
+    filteredSummary.forEach((row) => {
+      row.csData.forEach((cd) => {
+        if (cd.isUnder) {
+          if (!summaryCSFilter || cd.csName === summaryCSFilter) {
+            list.push({
+              date: row.date,
+              csName: cd.csName,
+              csLeadCount: cd.csLeadCount,
+              metaCount: cd.metaCount,
+              difference: cd.difference
+            });
+          }
+        }
+      });
+    });
+    return list;
+  }, [filteredSummary, summaryCSFilter]);
+
   return (
     <div className="space-y-6 mb-8">
       {/* Sub-Tab Navigation Bar */}
@@ -424,22 +468,176 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
 
             {/* Performance Stats Cards row */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Total CRM Chat Terinput</span>
+              <button
+                type="button"
+                onClick={() => setShowCRMDetails(!showCRMDetails)}
+                className={`p-3 rounded-lg border text-left cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-indigo-500 flex flex-col justify-between select-none ${
+                  showCRMDetails
+                    ? 'bg-indigo-50 border-indigo-300 ring-1 ring-indigo-200 shadow-xs'
+                    : 'bg-slate-50 border-slate-200 hover:bg-slate-100/80 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center justify-between w-full mb-1">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Total CRM Chat Terinput</span>
+                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 flex items-center gap-1">
+                    {showCRMDetails ? <ChevronUp className="w-2.5 h-2.5 text-indigo-700" /> : <ChevronDown className="w-2.5 h-2.5 text-indigo-700" />}
+                    <span>{showCRMDetails ? 'Sembunyikan' : 'Klik Detail'}</span>
+                  </span>
+                </div>
                 <span className="text-lg font-black text-slate-800">{totalCRMLeads} <span className="text-xs font-bold text-slate-500">Leads</span></span>
-              </div>
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <span className="text-[10px] text-slate-400 font-bold uppercase block">Total Meta Target Chats</span>
+              </button>
+
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex flex-col justify-between">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Total Meta Target Chats</span>
                 <span className="text-lg font-black text-indigo-700">{totalMetaChats} <span className="text-xs font-bold text-slate-500">Target</span></span>
               </div>
-              <div className="bg-red-50 p-3 rounded-lg border border-red-200">
-                <span className="text-[10px] text-red-600 font-bold uppercase block">Status Kecocokan</span>
-                <span className="text-sm font-bold text-red-800 flex items-center gap-1.5 mt-0.5">
+
+              <div className="bg-red-50 p-3 rounded-lg border border-red-200 flex flex-col justify-between">
+                <span className="text-[10px] text-red-600 font-bold uppercase block mb-1">Status Kecocokan</span>
+                <span className="text-sm font-bold text-red-800 flex items-center gap-1.5">
                   <AlertTriangle className="w-4 h-4 text-red-600" />
                   <span>Cek selisih tanggal bertanda merah</span>
                 </span>
               </div>
             </div>
+
+            {/* COLLAPSIBLE DETAILS PANEL */}
+            {showCRMDetails && (
+              <div className="bg-slate-50 border border-indigo-100 rounded-xl p-4.5 space-y-4 animate-fadeIn shadow-inner">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4.5 h-4.5 text-indigo-600 animate-pulse" />
+                    <div>
+                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                        Rincian Detail CRM Chat Terinput
+                      </h4>
+                      <p className="text-[10px] text-slate-500">
+                        Menampilkan breakdown per tanggal dan CS untuk setiap status performa
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCRMDetails(false)}
+                    className="text-[10px] text-slate-500 hover:text-slate-800 font-bold bg-white hover:bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 cursor-pointer transition-all shadow-2xs"
+                  >
+                    Tutup Rincian ✕
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* TABLE 1: Status Lebih */}
+                  <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-2xs">
+                    <div className="bg-emerald-50/80 px-3 py-2.5 border-b border-slate-200 flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-emerald-900 flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                        <span>1. Tanggal dengan Status LEBIH (CRM &gt; Meta Target)</span>
+                      </span>
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full">
+                        {exceedingDetails.length} Baris
+                      </span>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto">
+                      <table className="w-full text-left text-[11px] border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[9px]">
+                            <th className="p-2.5 pl-3.5">Tanggal</th>
+                            <th className="p-2.5">Petugas CS</th>
+                            <th className="p-2.5 text-center">CRM Chat</th>
+                            <th className="p-2.5 text-center">Meta Target</th>
+                            <th className="p-2.5 text-center pr-3.5">Kelebihan</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {exceedingDetails.length > 0 ? (
+                            exceedingDetails.map((item, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                                <td className="p-2.5 pl-3.5 font-bold text-slate-700">{item.date}</td>
+                                <td className="p-2.5 font-extrabold text-emerald-800">{item.csName}</td>
+                                <td className="p-2.5 text-center font-bold text-slate-800">{item.csLeadCount}</td>
+                                <td className="p-2.5 text-center text-slate-500">{item.metaCount}</td>
+                                <td className="p-2.5 text-center font-black text-emerald-600 pr-3.5">+{item.difference}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={5} className="p-6 text-center text-slate-400 font-medium">
+                                Tidak ada data berstatus Lebih pada filter saat ini.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                        {exceedingDetails.length > 0 && (
+                          <tfoot>
+                            <tr className="bg-slate-50 font-black border-t border-slate-200 text-slate-800 text-[10px]">
+                              <td colSpan={2} className="p-2.5 pl-3.5">TOTAL:</td>
+                              <td className="p-2.5 text-center text-slate-900 font-black">{exceedingDetails.reduce((s, x) => s + x.csLeadCount, 0)}</td>
+                              <td className="p-2.5 text-center text-slate-500">{exceedingDetails.reduce((s, x) => s + x.metaCount, 0)}</td>
+                              <td className="p-2.5 text-center text-emerald-600 font-black pr-3.5">+{exceedingDetails.reduce((s, x) => s + x.difference, 0)}</td>
+                            </tr>
+                          </tfoot>
+                        )}
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* TABLE 2: Status Selisih (Kekurangan) */}
+                  <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-2xs">
+                    <div className="bg-red-50 px-3 py-2.5 border-b border-slate-200 flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-red-900 flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
+                        <span>2. Tanggal dengan Status SELISIH (CRM &lt; Meta Target)</span>
+                      </span>
+                      <span className="bg-red-100 text-red-800 text-[10px] font-black px-2 py-0.5 rounded-full">
+                        {underDetails.length} Baris
+                      </span>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto">
+                      <table className="w-full text-left text-[11px] border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[9px]">
+                            <th className="p-2.5 pl-3.5">Tanggal</th>
+                            <th className="p-2.5">Petugas CS</th>
+                            <th className="p-2.5 text-center">CRM Chat</th>
+                            <th className="p-2.5 text-center">Meta Target</th>
+                            <th className="p-2.5 text-center pr-3.5">Selisih</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {underDetails.length > 0 ? (
+                            underDetails.map((item, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                                <td className="p-2.5 pl-3.5 font-bold text-slate-700">{item.date}</td>
+                                <td className="p-2.5 font-extrabold text-red-800">{item.csName}</td>
+                                <td className="p-2.5 text-center font-semibold text-slate-800">{item.csLeadCount}</td>
+                                <td className="p-2.5 text-center text-slate-500">{item.metaCount}</td>
+                                <td className="p-2.5 text-center font-black text-red-600 pr-3.5">{item.difference}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={5} className="p-6 text-center text-slate-400 font-medium">
+                                Tidak ada data berstatus Selisih pada filter saat ini.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                        {underDetails.length > 0 && (
+                          <tfoot>
+                            <tr className="bg-slate-50 font-black border-t border-slate-200 text-slate-800 text-[10px]">
+                              <td colSpan={2} className="p-2.5 pl-3.5">TOTAL:</td>
+                              <td className="p-2.5 text-center text-slate-900 font-black">{underDetails.reduce((s, x) => s + x.csLeadCount, 0)}</td>
+                              <td className="p-2.5 text-center text-slate-500">{underDetails.reduce((s, x) => s + x.metaCount, 0)}</td>
+                              <td className="p-2.5 text-center text-red-600 font-black pr-3.5">{underDetails.reduce((s, x) => s + x.difference, 0)}</td>
+                            </tr>
+                          </tfoot>
+                        )}
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Filter controls panel */}
             <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
