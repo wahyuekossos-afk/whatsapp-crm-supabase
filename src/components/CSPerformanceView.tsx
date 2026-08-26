@@ -153,19 +153,26 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
           (m) => m.tanggal === date && m.namaCS === cs.nama
         );
         const metaCount = metaEntry ? metaEntry.chatCount : 0;
-        const match = csLeadCount === metaCount;
+        
+        const exactMatch = csLeadCount === metaCount;
+        const isExceeding = csLeadCount > metaCount;
+        const isUnder = csLeadCount < metaCount;
+        const isOk = exactMatch || isExceeding;
 
         return {
           csName: cs.nama,
           csLeadCount,
           metaCount,
-          match,
+          exactMatch,
+          isExceeding,
+          isUnder,
+          isOk,
           difference: csLeadCount - metaCount
         };
       });
 
-      // Filter csData if the user selected a specific CS to view
-      const anyMismatch = csData.some((cd) => !cd.match);
+      // A date row is flagged as mismatch (red date) only if at least one CS is under performing (isUnder)
+      const anyMismatch = csData.some((cd) => cd.isUnder);
 
       return {
         date,
@@ -510,7 +517,10 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
                             csName: cs.nama,
                             csLeadCount: 0,
                             metaCount: 0,
-                            match: true,
+                            exactMatch: true,
+                            isExceeding: false,
+                            isUnder: false,
+                            isOk: true,
                             difference: 0
                           };
 
@@ -518,9 +528,11 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
                             <td 
                               key={cs.id} 
                               className={`p-3 text-xs border-l border-slate-100 transition-all ${
-                                !cellData.match 
+                                cellData.isUnder 
                                   ? 'bg-red-50/40 border-y border-red-100' 
-                                  : 'hover:bg-slate-100/10'
+                                  : cellData.isExceeding
+                                    ? 'bg-emerald-50/20 border-y border-emerald-100/50'
+                                    : 'hover:bg-slate-100/10'
                               }`}
                             >
                               <div className="space-y-1.5 flex flex-col items-center">
@@ -537,15 +549,22 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
                                 </div>
 
                                 {/* Status Badge */}
-                                {cellData.match ? (
+                                {cellData.exactMatch && (
                                   <span className="inline-flex items-center gap-0.5 px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] font-bold rounded-full">
                                     <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
                                     <span>Sesuai</span>
                                   </span>
-                                ) : (
+                                )}
+                                {cellData.isExceeding && (
+                                  <span className="inline-flex items-center gap-0.5 px-2.5 py-0.5 bg-emerald-500 text-white text-[9px] font-extrabold rounded-full shadow-xs">
+                                    <CheckCircle2 className="w-2.5 h-2.5 text-white" />
+                                    <span>Lebih (+{cellData.difference})</span>
+                                  </span>
+                                )}
+                                {cellData.isUnder && (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-800 text-[9px] font-black rounded-full border border-red-200">
                                     <XCircle className="w-2.5 h-2.5 text-red-600" />
-                                    <span>Selisih: {cellData.difference > 0 ? `+${cellData.difference}` : cellData.difference}</span>
+                                    <span>Selisih: {cellData.difference}</span>
                                   </span>
                                 )}
                               </div>
