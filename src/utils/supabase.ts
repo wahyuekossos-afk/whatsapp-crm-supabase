@@ -455,6 +455,27 @@ export async function dbUpsertMetaChat(chat: MetaChat): Promise<void> {
   }
 }
 
+export async function dbBulkUpsertMetaChats(chats: MetaChat[]): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+  if (chats.length === 0) return;
+  try {
+    const payload = chats.map(mc => ({
+      tanggal: mc.tanggal,
+      nama_cs: mc.namaCS || '',
+      chat_count: mc.chatCount || 0,
+      kondisi: mc.kondisi || ''
+    }));
+    const { error } = await supabase
+      .from('meta_chats')
+      .upsert(payload, { onConflict: 'tanggal,nama_cs' });
+    if (error) throw error;
+  } catch (e) {
+    console.error('Error bulk upserting Meta Chats to Supabase:', e);
+    throw e;
+  }
+}
+
 export async function dbDeleteMetaChat(tanggal: string, namaCS: string): Promise<void> {
   const supabase = getSupabaseClient();
   if (!supabase) return;

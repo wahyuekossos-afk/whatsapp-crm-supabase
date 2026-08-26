@@ -27,6 +27,7 @@ import {
   SupabaseConfig,
   dbGetMetaChats,
   dbUpsertMetaChat,
+  dbBulkUpsertMetaChats,
   dbDeleteMetaChat
 } from './utils/supabase';
 import { Navbar } from './components/Navbar';
@@ -390,6 +391,30 @@ export default function App() {
     } else {
       showToast('🗑️ Berhasil menghapus Meta Chat dari Local Storage!');
       return true;
+    }
+  };
+
+  const handleSyncAllMetaChats = async (): Promise<boolean> => {
+    if (!supabaseConfig.enabled) {
+      showToast('⚠️ Hubungkan database Supabase terlebih dahulu untuk melakukan sinkronisasi data!');
+      return false;
+    }
+    if (metaChats.length === 0) {
+      showToast('⚠️ Tidak ada data Meta Chat lokal yang dapat disinkronkan.');
+      return false;
+    }
+    try {
+      await dbBulkUpsertMetaChats(metaChats);
+      showToast(`✅ Berhasil menyinkronkan ${metaChats.length} data Meta Chat lokal ke Supabase Cloud!`);
+      const freshMetaChats = await dbGetMetaChats();
+      if (freshMetaChats && freshMetaChats.length > 0) {
+        setMetaChats(freshMetaChats);
+      }
+      return true;
+    } catch (err: any) {
+      showToast(`❌ Gagal sinkronisasi data Meta Chat: ${err.message || err}`);
+      console.error(err);
+      return false;
     }
   };
 
@@ -1187,6 +1212,7 @@ export default function App() {
             metaChats={metaChats}
             onUpsertMetaChat={handleUpsertMetaChat}
             onDeleteMetaChat={handleDeleteMetaChatItem}
+            onSyncAllMetaChats={handleSyncAllMetaChats}
           />
         )}
       </main>

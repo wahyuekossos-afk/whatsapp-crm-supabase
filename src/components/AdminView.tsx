@@ -59,6 +59,7 @@ interface AdminViewProps {
   metaChats?: MetaChat[];
   onUpsertMetaChat?: (chat: MetaChat) => Promise<boolean>;
   onDeleteMetaChat?: (tanggal: string, namaCS: string) => Promise<boolean>;
+  onSyncAllMetaChats?: () => Promise<boolean>;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({
@@ -91,6 +92,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   metaChats = [],
   onUpsertMetaChat,
   onDeleteMetaChat,
+  onSyncAllMetaChats,
 }) => {
   // All client names list
   const allClientNames = useMemo(() => {
@@ -253,6 +255,45 @@ export const AdminView: React.FC<AdminViewProps> = ({
       } finally {
         setIsSavingMeta(false);
       }
+    }
+  };
+
+  const handleSyncLocalMetaChatsToSupabase = async () => {
+    if (!onSyncAllMetaChats) return;
+    
+    // Check if user has anything filled in the form. If so, they probably expect it to be saved first.
+    if (metaDate && (metaChatCount || metaKondisi.trim())) {
+      let count = 0;
+      if (metaCSName) {
+        count = parseInt(metaChatCount, 10) || 0;
+      }
+      
+      setIsSavingMeta(true);
+      try {
+        await onUpsertMetaChat?.({
+          id: `meta-${Date.now()}`,
+          tanggal: metaDate,
+          namaCS: metaCSName,
+          chatCount: count,
+          kondisi: metaKondisi.trim(),
+        });
+        setMetaChatCount('');
+        setMetaKondisi('');
+      } catch (err: any) {
+        console.error('Failed to pre-upsert current input:', err);
+      }
+    }
+
+    setIsSavingMeta(true);
+    try {
+      const success = await onSyncAllMetaChats();
+      if (success) {
+        onShowToast(`✅ Berhasil menyinkronkan seluruh (${metaChats.length}) data lokal ke Supabase Cloud!`);
+      }
+    } catch (err: any) {
+      onShowToast(`❌ Gagal sinkronisasi data lokal ke Supabase: ${err.message || err}`);
+    } finally {
+      setIsSavingMeta(false);
     }
   };
 
@@ -1100,13 +1141,13 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 {supabaseConfig.enabled && (
                   <button
                     type="button"
-                    onClick={handleSaveMetaChat}
+                    onClick={handleSyncLocalMetaChatsToSupabase}
                     disabled={isSavingMeta}
-                    className="py-2 px-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:bg-slate-300 text-white font-bold text-xs rounded-lg transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
-                    title="Simpan Data & Sinkron ke Supabase"
+                    className="py-2 px-3 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:bg-slate-300 text-white font-bold text-xs rounded-lg transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                    title={`Simpan & Sinkronkan ${metaChats.length} Data Lokal ke Supabase Cloud`}
                   >
                     <Database className="w-3.5 h-3.5 text-white" />
-                    <span>Simpan Data</span>
+                    <span>Simpan &amp; Sinkron ({metaChats.length} Data)</span>
                   </button>
                 )}
               </div>
