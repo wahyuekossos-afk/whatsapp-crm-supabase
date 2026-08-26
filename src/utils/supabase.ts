@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Lead, CSUser, DashboardClient, KPITargets, KPITargetsMap, ProductsMap, SpreadsheetConfig } from '../types';
+import { Lead, CSUser, DashboardClient, KPITargets, KPITargetsMap, ProductsMap, SpreadsheetConfig, MetaChat } from '../types';
 
 export interface SupabaseConfig {
   url: string;
@@ -407,6 +407,68 @@ export async function dbDeleteProduct(clientName: string, productName: string): 
   }
 }
 
+// --- META CHATS ---
+export async function dbGetMetaChats(): Promise<MetaChat[]> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('meta_chats')
+      .select('*');
+
+    if (error) {
+      if (error.code === 'PGRST116' || error.message?.includes('relation "meta_chats" does not exist')) {
+        console.warn('Tabel "meta_chats" belum terbuat di Supabase, mengembalikan array kosong.');
+        return [];
+      }
+      throw error;
+    }
+    return (data || []).map(item => ({
+      id: String(item.id),
+      tanggal: item.tanggal,
+      namaCS: item.nama_cs,
+      chatCount: Number(item.chat_count || 0)
+    }));
+  } catch (e) {
+    console.error('Error fetching Meta Chats from Supabase:', e);
+    return [];
+  }
+}
+
+export async function dbUpsertMetaChat(chat: MetaChat): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+  try {
+    const { error } = await supabase
+      .from('meta_chats')
+      .upsert({
+        tanggal: chat.tanggal,
+        nama_cs: chat.namaCS,
+        chat_count: chat.chatCount
+      }, { onConflict: 'tanggal,nama_cs' });
+    if (error) throw error;
+  } catch (e) {
+    console.error('Error upserting Meta Chat to Supabase:', e);
+    throw e;
+  }
+}
+
+export async function dbDeleteMetaChat(tanggal: string, namaCS: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+  try {
+    const { error } = await supabase
+      .from('meta_chats')
+      .delete()
+      .eq('tanggal', tanggal)
+      .eq('nama_cs', namaCS);
+    if (error) throw error;
+  } catch (e) {
+    console.error('Error deleting Meta Chat from Supabase:', e);
+    throw e;
+  }
+}
+
 // --- SPREADSHEET CONFIG ---
 export async function dbGetSpreadsheetConfig(): Promise<SpreadsheetConfig | null> {
   const supabase = getSupabaseClient();
@@ -678,6 +740,15 @@ CREATE TABLE IF NOT EXISTS spreadsheet_config (
     last_synced_at TEXT
 );
 
+-- 7. Tabel Meta Chats (Target Chat Masuk)
+CREATE TABLE IF NOT EXISTS meta_chats (
+    id SERIAL PRIMARY KEY,
+    tanggal TEXT NOT NULL,
+    nama_cs TEXT NOT NULL,
+    chat_count INTEGER DEFAULT 0,
+    UNIQUE(tanggal, nama_cs)
+);
+
 -- AKTIFKAN BARIS INI JIKA ANDA INGIN MENGAKTIFKAN KEAMANAN RLS (Optional)
 -- Secara bawaan, Anda bisa membiarkan RLS nonaktif atau buat kebijakan bypass anon jika ingin mudah.
 ALTER TABLE dashboards DISABLE ROW LEVEL SECURITY;
@@ -686,6 +757,7 @@ ALTER TABLE leads DISABLE ROW LEVEL SECURITY;
 ALTER TABLE kpi_targets DISABLE ROW LEVEL SECURITY;
 ALTER TABLE products DISABLE ROW LEVEL SECURITY;
 ALTER TABLE spreadsheet_config DISABLE ROW LEVEL SECURITY;
+ALTER TABLE meta_chats DISABLE ROW LEVEL SECURITY;
 `;
 
 // Clear all tables in connected Supabase

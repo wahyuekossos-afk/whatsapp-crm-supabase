@@ -114,3 +114,11 @@ export type KPITargetsMap = Record<string, KPITargets>;
 
 export type ProductsMap = Record<string, string[]>;
 
+export interface MetaChat {
+  id?: string;
+  tanggal: string;
+  namaCS: string;
+  chatCount: number;
+}
+
+

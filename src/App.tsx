@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Lead, CSUser, FilterOptions, SpreadsheetConfig, DashboardClient, KPITargets, KPITargetsMap, ProductsMap } from './types';
+import { Lead, CSUser, FilterOptions, SpreadsheetConfig, DashboardClient, KPITargets, KPITargetsMap, ProductsMap, MetaChat } from './types';
 import { INITIAL_LEADS, INITIAL_CS_LIST, INDONESIAN_CITIES } from './data/initialData';
 import { exportToExcel, exportToCSV, parseExcelFile, fetchGoogleSheetsLeads, pushLeadsToGoogleSheets, pushCSToGoogleSheets, pushKPIToGoogleSheets, pushProductsToGoogleSheets, normalizeDateString, ensureValidLeadHistory } from './utils/spreadsheet';
 import {
@@ -24,7 +24,10 @@ import {
   dbUpsertSpreadsheetConfig,
   dbBulkSeed,
   dbClearAllSupabaseData,
-  SupabaseConfig
+  SupabaseConfig,
+  dbGetMetaChats,
+  dbUpsertMetaChat,
+  dbDeleteMetaChat
 } from './utils/supabase';
 import { Navbar } from './components/Navbar';
 import { DashboardKPI } from './components/DashboardKPI';
@@ -108,13 +111,14 @@ export default function App() {
         const client = getSupabaseClient();
         if (!client) return;
 
-        const [dbLeads, dbCS, dbDashes, dbKPI, dbProds, dbSsheet] = await Promise.all([
+        const [dbLeads, dbCS, dbDashes, dbKPI, dbProds, dbSsheet, dbMetaChats] = await Promise.all([
           dbGetLeads().catch(() => null),
           dbGetCSUsers().catch(() => null),
           dbGetDashboards().catch(() => null),
           dbGetKPITargets().catch(() => null),
           dbGetProducts().catch(() => null),
-          dbGetSpreadsheetConfig().catch(() => null)
+          dbGetSpreadsheetConfig().catch(() => null),
+          dbGetMetaChats().catch(() => null)
         ]);
 
         if (dbLeads) {
@@ -149,6 +153,10 @@ export default function App() {
         if (dbSsheet) {
           setSpreadsheetConfig(dbSsheet);
           localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(dbSsheet));
+        }
+        if (dbMetaChats && dbMetaChats.length > 0) {
+          setMetaChats(dbMetaChats);
+          localStorage.setItem('crm_wa_meta_chats_v1', JSON.stringify(dbMetaChats));
         }
 
         showToast('⚡ Data CRM berhasil dimuat dari Supabase Cloud Database!');
@@ -311,6 +319,56 @@ export default function App() {
       console.error('Failed to save products map:', e);
     }
   }, [productsMap]);
+
+  // Meta Chats state for target chat counts input by admin
+  const [metaChats, setMetaChats] = useState<MetaChat[]>(() => {
+    try {
+      const saved = localStorage.getItem('crm_wa_meta_chats_v1');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('Failed to load meta chats from storage:', e);
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('crm_wa_meta_chats_v1', JSON.stringify(metaChats));
+    } catch (e) {
+      console.error('Failed to save meta chats:', e);
+    }
+  }, [metaChats]);
+
+  // Handler to add or update a MetaChat target entry
+  const handleUpsertMetaChat = async (chat: MetaChat) => {
+    const existingIdx = metaChats.findIndex(
+      (m) => m.tanggal === chat.tanggal && m.namaCS === chat.namaCS
+    );
+
+    let updated: MetaChat[];
+    if (existingIdx >= 0) {
+      updated = [...metaChats];
+      updated[existingIdx] = chat;
+    } else {
+      updated = [...metaChats, chat];
+    }
+    setMetaChats(updated);
+
+    if (supabaseConfig.enabled) {
+      await dbUpsertMetaChat(chat).catch(err => console.error('Supabase upsert meta chat error:', err));
+    }
+  };
+
+  const handleDeleteMetaChatItem = async (tanggal: string, namaCS: string) => {
+    const updated = metaChats.filter((m) => !(m.tanggal === tanggal && m.namaCS === namaCS));
+    setMetaChats(updated);
+
+    if (supabaseConfig.enabled) {
+      await dbDeleteMetaChat(tanggal, namaCS).catch(err => console.error('Supabase delete meta chat error:', err));
+    }
+  };
 
   // Google Sheets Sync Status Overlay
   const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'completed'>('idle');
@@ -1070,6 +1128,7 @@ export default function App() {
             leads={dashboardBelongingLeads}
             csList={dashboardBelongingCSList}
             activeDashboardName={activeDashboardName}
+            metaChats={metaChats}
           />
         )}
 
@@ -1102,6 +1161,9 @@ export default function App() {
             onMigrateToSupabase={handleMigrateToSupabase}
             onClearSupabaseData={handleClearSupabaseData}
             activeDashboardName={activeDashboardName}
+            metaChats={metaChats}
+            onUpsertMetaChat={handleUpsertMetaChat}
+            onDeleteMetaChat={handleDeleteMetaChatItem}
           />
         )}
       </main>

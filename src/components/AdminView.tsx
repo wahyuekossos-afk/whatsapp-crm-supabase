@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CSUser, Lead, SpreadsheetConfig, DashboardClient, KPITargets, KPITargetsMap, ProductsMap } from '../types';
+import { CSUser, Lead, SpreadsheetConfig, DashboardClient, KPITargets, KPITargetsMap, ProductsMap, MetaChat } from '../types';
 import { getProductsForDashboard } from '../utils/spreadsheet';
 import { SupabaseConfig, testSupabaseConnection, SUPABASE_SQL_SCRIPT, dbGetDatabaseSize } from '../utils/supabase';
 import {
@@ -56,6 +56,9 @@ interface AdminViewProps {
   onMigrateToSupabase: () => Promise<{ success: boolean; message: string }>;
   onClearSupabaseData?: () => Promise<{ success: boolean; message: string }>;
   activeDashboardName?: string;
+  metaChats?: MetaChat[];
+  onUpsertMetaChat?: (chat: MetaChat) => void;
+  onDeleteMetaChat?: (tanggal: string, namaCS: string) => void;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({
@@ -85,6 +88,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
   onMigrateToSupabase,
   onClearSupabaseData,
   activeDashboardName,
+  metaChats = [],
+  onUpsertMetaChat,
+  onDeleteMetaChat,
 }) => {
   // All client names list
   const allClientNames = useMemo(() => {
@@ -194,6 +200,34 @@ export const AdminView: React.FC<AdminViewProps> = ({
   // Storage usage states
   const [supabaseRealSize, setSupabaseRealSize] = useState<number | null>(null);
   const [isFetchingSize, setIsFetchingSize] = useState(false);
+
+  // Meta Chats Form State
+  const [metaDate, setMetaDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [metaCSName, setMetaCSName] = useState<string>('');
+  const [metaChatCount, setMetaChatCount] = useState<string>('');
+
+  const handleSaveMetaChat = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!metaDate || !metaCSName || !metaChatCount) {
+      onShowToast('⚠️ Harap isi semua kolom input data Meta Chat.');
+      return;
+    }
+    const count = parseInt(metaChatCount, 10);
+    if (isNaN(count) || count < 0) {
+      onShowToast('⚠️ Jumlah chat masuk harus angka positif.');
+      return;
+    }
+    if (onUpsertMetaChat) {
+      onUpsertMetaChat({
+        id: `meta-${Date.now()}`,
+        tanggal: metaDate,
+        namaCS: metaCSName,
+        chatCount: count,
+      });
+      onShowToast(`✅ Berhasil menyimpan target Meta Chat untuk ${metaCSName} pada ${metaDate}: ${count} chats.`);
+      setMetaChatCount('');
+    }
+  };
 
   useEffect(() => {
     const fetchSize = async () => {
@@ -945,6 +979,120 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* INPUT DATA META CHATS */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+              <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
+                <Globe className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">
+                  Input Meta Chat (Target Masuk)
+                </h3>
+                <p className="text-[11px] text-slate-400 font-medium">
+                  Input data chat masuk Meta per tanggal untuk masing-masing CS
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveMetaChat} className="space-y-3">
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Tanggal <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={metaDate}
+                  onChange={(e) => setMetaDate(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Pilih Petugas CS <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={metaCSName}
+                  onChange={(e) => setMetaCSName(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white cursor-pointer"
+                  required
+                >
+                  <option value="">-- Pilih CS --</option>
+                  {csList.map((cs) => (
+                    <option key={cs.id} value={cs.nama}>
+                      👤 {cs.nama} ({cs.clientName || 'Global'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Jumlah Chat Masuk (Meta) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={metaChatCount}
+                  onChange={(e) => setMetaChatCount(e.target.value)}
+                  placeholder="Contoh: 40"
+                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs rounded-lg transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Simpan Target Meta Chat</span>
+              </button>
+            </form>
+
+            {/* List of Entered Meta Chats */}
+            {metaChats && metaChats.length > 0 && (
+              <div className="pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">
+                    Riwayat Input Meta Chat:
+                  </span>
+                  <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded">
+                    {metaChats.length} Data
+                  </span>
+                </div>
+
+                <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 text-xs">
+                  {metaChats.slice().sort((a, b) => b.tanggal.localeCompare(a.tanggal)).map((mc, idx) => (
+                    <div
+                      key={`${mc.tanggal}-${mc.namaCS}-${idx}`}
+                      className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded font-medium text-slate-800 hover:bg-emerald-50/50 transition-all"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-bold text-emerald-800">{mc.namaCS}</span>
+                        <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                          📅 {mc.tanggal} — <strong className="text-slate-700 font-extrabold">{mc.chatCount} Chats</strong>
+                        </span>
+                      </div>
+                      {onDeleteMetaChat && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteMetaChat(mc.tanggal, mc.namaCS)}
+                          className="p-1 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
+                          title="Hapus Input"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-4">
