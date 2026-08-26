@@ -174,10 +174,13 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
       // A date row is flagged as mismatch (red date) only if at least one CS is under performing (isUnder)
       const anyMismatch = csData.some((cd) => cd.isUnder);
 
-      // Extract general date condition or fallback to first CS condition on that date
-      const generalEntry = metaChats.find((m) => m.tanggal === date && !m.namaCS);
-      const anyCondEntry = metaChats.find((m) => m.tanggal === date && m.kondisi);
-      const kondisi = generalEntry?.kondisi || anyCondEntry?.kondisi || '';
+      // Extract condition that belongs to active CS, or fallback to a general condition on that date
+      const activeCSNames = csList.map((cs) => cs.nama);
+      const activeCSCondEntry = metaChats.find(
+        (m) => m.tanggal === date && m.kondisi && m.namaCS && activeCSNames.includes(m.namaCS)
+      );
+      const generalEntry = metaChats.find((m) => m.tanggal === date && !m.namaCS && m.kondisi);
+      const kondisi = activeCSCondEntry?.kondisi || generalEntry?.kondisi || '';
 
       return {
         date,
