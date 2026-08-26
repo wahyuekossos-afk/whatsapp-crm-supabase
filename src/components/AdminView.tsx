@@ -57,8 +57,8 @@ interface AdminViewProps {
   onClearSupabaseData?: () => Promise<{ success: boolean; message: string }>;
   activeDashboardName?: string;
   metaChats?: MetaChat[];
-  onUpsertMetaChat?: (chat: MetaChat) => void;
-  onDeleteMetaChat?: (tanggal: string, namaCS: string) => void;
+  onUpsertMetaChat?: (chat: MetaChat) => Promise<boolean>;
+  onDeleteMetaChat?: (tanggal: string, namaCS: string) => Promise<boolean>;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({
@@ -206,8 +206,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [metaCSName, setMetaCSName] = useState<string>('');
   const [metaChatCount, setMetaChatCount] = useState<string>('');
   const [metaKondisi, setMetaKondisi] = useState<string>('');
+  const [isSavingMeta, setIsSavingMeta] = useState<boolean>(false);
 
-  const handleSaveMetaChat = (e: React.FormEvent) => {
+  const handleSaveMetaChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!metaDate) {
       onShowToast('⚠️ Harap pilih tanggal.');
@@ -233,22 +234,25 @@ export const AdminView: React.FC<AdminViewProps> = ({
     }
 
     if (onUpsertMetaChat) {
-      onUpsertMetaChat({
-        id: `meta-${Date.now()}`,
-        tanggal: metaDate,
-        namaCS: metaCSName, // can be empty string for general date conditions
-        chatCount: count,
-        kondisi: metaKondisi.trim(),
-      });
+      setIsSavingMeta(true);
+      try {
+        const success = await onUpsertMetaChat({
+          id: `meta-${Date.now()}`,
+          tanggal: metaDate,
+          namaCS: metaCSName, // can be empty string for general date conditions
+          chatCount: count,
+          kondisi: metaKondisi.trim(),
+        });
 
-      if (metaCSName) {
-        onShowToast(`✅ Berhasil menyimpan target Meta Chat untuk ${metaCSName} pada ${metaDate}: ${count} chats.`);
-      } else {
-        onShowToast(`✅ Berhasil menyimpan Kondisi Hari pada ${metaDate}: "${metaKondisi}".`);
+        if (success) {
+          setMetaChatCount('');
+          setMetaKondisi('');
+        }
+      } catch (err: any) {
+        onShowToast(`❌ Gagal menyimpan: ${err.message || err}`);
+      } finally {
+        setIsSavingMeta(false);
       }
-
-      setMetaChatCount('');
-      setMetaKondisi('');
     }
   };
 
@@ -1079,13 +1083,33 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 />
               </div>
 
-              <button
-                type="submit"
-                className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs rounded-lg transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span>Simpan Target Meta Chat</span>
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <button
+                  type="submit"
+                  disabled={isSavingMeta}
+                  className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold text-xs rounded-lg transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                >
+                  {isSavingMeta ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Check className="w-3.5 h-3.5" />
+                  )}
+                  <span>Simpan Target Meta Chat</span>
+                </button>
+                
+                {supabaseConfig.enabled && (
+                  <button
+                    type="button"
+                    onClick={handleSaveMetaChat}
+                    disabled={isSavingMeta}
+                    className="py-2 px-4 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:bg-slate-300 text-white font-bold text-xs rounded-lg transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                    title="Simpan Data & Sinkron ke Supabase"
+                  >
+                    <Database className="w-3.5 h-3.5 text-white" />
+                    <span>Simpan Data</span>
+                  </button>
+                )}
+              </div>
             </form>
 
             {/* List of Entered Meta Chats */}

@@ -184,7 +184,8 @@ export default function App() {
       leads,
       kpiTargetsMap,
       productsMap,
-      spreadsheetConfig
+      spreadsheetConfig,
+      metaChats
     });
     return res;
   };
@@ -342,7 +343,7 @@ export default function App() {
   }, [metaChats]);
 
   // Handler to add or update a MetaChat target entry
-  const handleUpsertMetaChat = async (chat: MetaChat) => {
+  const handleUpsertMetaChat = async (chat: MetaChat): Promise<boolean> => {
     const existingIdx = metaChats.findIndex(
       (m) => m.tanggal === chat.tanggal && m.namaCS === chat.namaCS
     );
@@ -357,16 +358,38 @@ export default function App() {
     setMetaChats(updated);
 
     if (supabaseConfig.enabled) {
-      await dbUpsertMetaChat(chat).catch(err => console.error('Supabase upsert meta chat error:', err));
+      try {
+        await dbUpsertMetaChat(chat);
+        showToast('✅ Berhasil menyimpan target Meta Chat ke Supabase Cloud!');
+        return true;
+      } catch (err: any) {
+        showToast(`❌ Gagal menyimpan ke Supabase: ${err.message || err}. Pastikan Tabel 'meta_chats' sudah terbuat.`);
+        console.error('Supabase upsert meta chat error:', err);
+        return false;
+      }
+    } else {
+      showToast('✅ Berhasil menyimpan target Meta Chat ke Local Storage!');
+      return true;
     }
   };
 
-  const handleDeleteMetaChatItem = async (tanggal: string, namaCS: string) => {
+  const handleDeleteMetaChatItem = async (tanggal: string, namaCS: string): Promise<boolean> => {
     const updated = metaChats.filter((m) => !(m.tanggal === tanggal && m.namaCS === namaCS));
     setMetaChats(updated);
 
     if (supabaseConfig.enabled) {
-      await dbDeleteMetaChat(tanggal, namaCS).catch(err => console.error('Supabase delete meta chat error:', err));
+      try {
+        await dbDeleteMetaChat(tanggal, namaCS);
+        showToast('🗑️ Berhasil menghapus Meta Chat dari Supabase!');
+        return true;
+      } catch (err: any) {
+        showToast(`❌ Gagal menghapus dari Supabase: ${err.message || err}`);
+        console.error('Supabase delete meta chat error:', err);
+        return false;
+      }
+    } else {
+      showToast('🗑️ Berhasil menghapus Meta Chat dari Local Storage!');
+      return true;
     }
   };
 

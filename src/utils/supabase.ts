@@ -528,6 +528,7 @@ export async function dbBulkSeed(data: {
   kpiTargetsMap: KPITargetsMap;
   productsMap: ProductsMap;
   spreadsheetConfig: SpreadsheetConfig;
+  metaChats?: MetaChat[];
 }): Promise<{ success: boolean; message: string }> {
   const supabase = getSupabaseClient();
   if (!supabase) return { success: false, message: 'Supabase belum dikoneksikan.' };
@@ -652,6 +653,18 @@ export async function dbBulkSeed(data: {
           if (error) throw new Error(`Leads chunk seed failing at ${i}: ${error.message}`);
         }
       }
+    }
+
+    // 5.5. Seed Meta Chats
+    if (data.metaChats && data.metaChats.length > 0) {
+      const payload = data.metaChats.map(mc => ({
+        tanggal: mc.tanggal,
+        nama_cs: mc.namaCS,
+        chat_count: mc.chatCount,
+        kondisi: mc.kondisi || ''
+      }));
+      const { error: errMeta } = await supabase.from('meta_chats').upsert(payload, { onConflict: 'tanggal,nama_cs' });
+      if (errMeta) throw new Error(`Meta Chats seed failed: ${errMeta.message}`);
     }
 
     // 6. Seed config
@@ -808,6 +821,10 @@ export async function dbClearAllSupabaseData(): Promise<{ success: boolean; mess
     // 6. Delete spreadsheet_config
     const { error: errConfig } = await supabase.from('spreadsheet_config').delete().neq('id', '_dummy_key_');
     if (errConfig) throw new Error(`Spreadsheet Config: ${errConfig.message}`);
+
+    // 7. Delete meta_chats
+    const { error: errMeta } = await supabase.from('meta_chats').delete().neq('tanggal', '_dummy_key_');
+    if (errMeta) throw new Error(`Meta Chats: ${errMeta.message}`);
 
     return { success: true, message: 'Seluruh database di Supabase berhasil dikosongkan!' };
   } catch (err: any) {
