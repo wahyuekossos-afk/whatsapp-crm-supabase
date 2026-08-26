@@ -212,10 +212,29 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
   }, [summaryData, summarySearch, mismatchOnly, summaryCSFilter]);
 
   // Total summary aggregates
-  const totalCRMLeads = useMemo(() => leads.length, [leads]);
+  const totalCRMLeads = useMemo(() => {
+    let sum = 0;
+    filteredSummary.forEach((row) => {
+      row.csData.forEach((cd) => {
+        if (!summaryCSFilter || cd.csName === summaryCSFilter) {
+          sum += cd.csLeadCount;
+        }
+      });
+    });
+    return sum;
+  }, [filteredSummary, summaryCSFilter]);
+
   const totalMetaChats = useMemo(() => {
-    return metaChats.reduce((sum, item) => sum + (item.chatCount || 0), 0);
-  }, [metaChats]);
+    let sum = 0;
+    filteredSummary.forEach((row) => {
+      row.csData.forEach((cd) => {
+        if (!summaryCSFilter || cd.csName === summaryCSFilter) {
+          sum += cd.metaCount;
+        }
+      });
+    });
+    return sum;
+  }, [filteredSummary, summaryCSFilter]);
 
   return (
     <div className="space-y-6 mb-8">
