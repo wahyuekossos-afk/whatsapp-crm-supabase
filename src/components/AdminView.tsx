@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CSUser, Lead, SpreadsheetConfig, DashboardClient, KPITargets, KPITargetsMap, ProductsMap, MetaChat } from '../types';
-import { getProductsForDashboard } from '../utils/spreadsheet';
+import { getProductsForDashboard, parseExcelFile } from '../utils/spreadsheet';
 import { SupabaseConfig, testSupabaseConnection, SUPABASE_SQL_SCRIPT, dbGetDatabaseSize } from '../utils/supabase';
 import {
   Users,
@@ -60,6 +60,8 @@ interface AdminViewProps {
   onUpsertMetaChat?: (chat: MetaChat) => Promise<boolean>;
   onDeleteMetaChat?: (tanggal: string, namaCS: string) => Promise<boolean>;
   onSyncAllMetaChats?: () => Promise<boolean>;
+  onBulkImportLeads?: (parsed: Partial<Lead>[], filename: string) => Promise<{ added: number; updated: number; batchId: string }>;
+  onDeleteLastImportBatch?: () => Promise<{ success: boolean; deletedCount: number; clearedCount: number; message: string }>;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({
@@ -93,6 +95,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
   onUpsertMetaChat,
   onDeleteMetaChat,
   onSyncAllMetaChats,
+  onBulkImportLeads,
+  onDeleteLastImportBatch,
 }) => {
   // All client names list
   const allClientNames = useMemo(() => {
@@ -107,6 +111,156 @@ export const AdminView: React.FC<AdminViewProps> = ({
   // Selected Product Database Dashboard Client
   const [selectedProdDashboard, setSelectedProdDashboard] = useState<string>(activeDashboardName || 'Wibu Sales (Utama)');
   const [newProductName, setNewProductName] = useState<string>('');
+
+  // Upload States
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [lastBatchId, setLastBatchId] = useState<string | null>(() => {
+    return localStorage.getItem('crm_last_upload_batch');
+  });
+  const [showRollbackConfirmModal, setShowRollbackConfirmModal] = useState(false);
+
+  const handleProcessFile = async (file: File) => {
+    if (!onBulkImportLeads) return;
+    setIsUploading(true);
+    setUploadError(null);
+    setUploadSuccess(null);
+    try {
+      const parsed = await parseExcelFile(file);
+      if (!parsed || parsed.length === 0) {
+        throw new Error('File kosong atau tidak memiliki data yang valid.');
+      }
+      
+      const res = await onBulkImportLeads(parsed, file.name);
+      
+      const successMsg = `Berhasil mengunggah file '${file.name}'!\n` +
+        `- ${res.added} data baru berhasil didaftarkan.\n` +
+        `- ${res.updated} data lama berhasil ditimpa (Smart Upsert).`;
+        
+      setUploadSuccess(successMsg);
+      setLastBatchId(res.batchId);
+      onShowToast(`🎉 Berhasil memproses berkas upload: ${file.name}`);
+    } catch (err: any) {
+      console.error(err);
+      setUploadError(err.message || 'Gagal memproses file Excel/CSV. Pastikan format kolom sesuai template.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleProcessFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleProcessFile(e.target.files[0]);
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    const headers = [
+      "Nama Klien",
+      "Nama CS",
+      "Nomor WhatsApp",
+      "Nama Customer",
+      "Kategori Flow Lead",
+      "Alasan Lost",
+      "Tanggal Leads Masuk",
+      "Jam Masuk Leads",
+      "Jam Balas",
+      "Lokasi Leads (Kota)",
+      "Note Customer",
+      "Item Order",
+      "Quantity Order (pcs)",
+      "Total Invoice (Rp)"
+    ];
+    
+    const sampleRow1 = [
+      "Wibu Sales (Utama)",
+      "Anggie",
+      "081234567890",
+      "Budi Santoso",
+      "New Leads",
+      "",
+      "2026-08-01",
+      "09:30",
+      "09:35",
+      "Surabaya",
+      "Tertarik dengan produk baju anime",
+      "Kaos Naruto Black XL",
+      "2",
+      "250000"
+    ];
+    
+    const sampleRow2 = [
+      "Wibu Sales (Utama)",
+      "Zefa",
+      "085712345678",
+      "Siti Rahma",
+      "Lost",
+      "Harga Terlalu Mahal",
+      "2026-08-02",
+      "10:15",
+      "10:25",
+      "Jakarta",
+      "Ingin diskon ongkir",
+      "Jaket Tanjiro Green L",
+      "1",
+      "180000"
+    ];
+
+    const csvContent = "\uFEFF" + [
+      headers.join(','),
+      sampleRow1.join(','),
+      sampleRow2.join(',')
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'Template_CRM_Upload_Data.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    onShowToast('📥 Template unggahan data berhasil diunduh!');
+  };
+
+  const handleExecuteRollback = async () => {
+    if (!onDeleteLastImportBatch) return;
+    try {
+      const res = await onDeleteLastImportBatch();
+      if (res.success) {
+        onShowToast(`🗑️ ${res.message}`);
+        setUploadSuccess(null);
+        setUploadError(null);
+        setLastBatchId(null);
+        setShowRollbackConfirmModal(false);
+      } else {
+        onShowToast(`⚠️ ${res.message}`);
+      }
+    } catch (err: any) {
+      onShowToast(`❌ Gagal membatalkan unggahan terakhir: ${err.message || err}`);
+    }
+  };
 
   useEffect(() => {
     if (activeDashboardName) {
@@ -853,6 +1007,133 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+
+          {/* UPLOAD / IMPORT DATA CARD */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                  <FileSpreadsheet className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">
+                    Upload / Import Data Leads (Smart Upsert)
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-medium">
+                    Unggah dokumen CSV/Excel untuk tambah/perbarui data leads dengan pola tanggal mundur
+                  </p>
+                </div>
+              </div>
+              
+              <button
+                type="button"
+                onClick={handleDownloadTemplate}
+                className="self-start sm:self-center px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 hover:text-slate-900 font-bold text-[11px] rounded-lg transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Unduh Template CSV</span>
+              </button>
+            </div>
+
+            {/* Smart Upsert Method Explain Banner */}
+            <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-lg text-xs text-blue-950 space-y-1.5">
+              <p className="font-bold flex items-center gap-1">
+                <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
+                <span>Metode A: Sistem Timpa Otomatis (Smart Upsert)</span>
+              </p>
+              <p className="leading-relaxed font-medium">
+                Sistem mendeteksi <strong>Nomor WhatsApp</strong> sebagai kunci unik. Jika data dengan nomor yang sama ditemukan, data lama akan ditimpa (overwritten) secara otomatis. Jika tidak ada, data baru akan didaftarkan. Sempurna untuk mengoreksi kesalahan ketik tanpa menduplikasi data!
+              </p>
+              <p className="text-[10px] text-blue-700 font-bold">
+                * Catatan: File berkas yang Anda unggah diproses langsung di browser Anda dan TIDAK disimpan di database Supabase Storage.
+              </p>
+            </div>
+
+            {/* Drag & Drop Upload Zone */}
+            <div
+              onDragEnter={handleDrag}
+              onDragOver={handleDrag}
+              onDragLeave={handleDrag}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer relative ${
+                dragActive
+                  ? 'border-blue-500 bg-blue-50/40'
+                  : 'border-slate-200 hover:border-blue-400 hover:bg-slate-50/50'
+              }`}
+            >
+              <input
+                type="file"
+                id="leads-file-upload"
+                className="hidden"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileChange}
+                disabled={isUploading}
+              />
+              <label htmlFor="leads-file-upload" className="cursor-pointer block space-y-2">
+                <div className="flex justify-center">
+                  <div className={`p-3 rounded-full ${isUploading ? 'bg-blue-100' : 'bg-slate-100'}`}>
+                    <Upload className={`w-6 h-6 ${isUploading ? 'text-blue-600 animate-bounce' : 'text-slate-400'}`} />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-700">
+                    {isUploading ? 'Sedang memproses dokumen...' : 'Tarik & lepas file di sini, atau klik untuk memilih file'}
+                  </p>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-1">
+                    Mendukung format file: Excel (.xlsx, .xls) atau teks (.csv)
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Upload Feedback / Alerts */}
+            {uploadError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-800 flex items-start gap-2 animate-fadeIn">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold">Gagal Mengimpor Data</p>
+                  <p className="font-medium text-red-700 mt-0.5">{uploadError}</p>
+                </div>
+              </div>
+            )}
+
+            {uploadSuccess && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-xs text-green-800 flex items-start gap-2 animate-fadeIn">
+                <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                <div className="whitespace-pre-line font-medium leading-relaxed">
+                  <p className="font-bold text-green-950">Impor Berhasil!</p>
+                  {uploadSuccess}
+                </div>
+              </div>
+            )}
+
+            {/* Undo / Rollback Section */}
+            {lastBatchId && (
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      Riwayat Unggahan Terakhir
+                    </p>
+                    <p className="font-bold text-slate-800 break-all flex items-center gap-1.5 pr-2">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
+                      {lastBatchId}
+                    </p>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowRollbackConfirmModal(true)}
+                    className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 hover:border-red-300 font-bold text-[11px] rounded-lg transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                    title="Undo uploader: Batalkan unggahan file ini"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                    <span>Hapus Impor Terakhir</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
         </div>
@@ -2114,6 +2395,67 @@ $$ LANGUAGE sql SECURITY DEFINER;`;
                 className="px-4 py-1.5 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded transition-all cursor-pointer shadow-xs"
               >
                 Ya, Hapus Bersih Supabase
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: KONFIRMASI PEMBATALAN IMPOR (ROLLBACK) */}
+      {showRollbackConfirmModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden animate-scaleIn">
+            <div className="p-4 bg-red-50 border-b border-red-100 flex items-center gap-3">
+              <div className="p-2 bg-red-100 text-red-700 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-red-700" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-red-950 uppercase tracking-tight">
+                  Batalkan Unggahan Berkas Terakhir?
+                </h3>
+                <p className="text-[10px] text-red-600 font-semibold mt-0.5">
+                  Tindakan ini akan mengembalikan data ke status sebelum uploader.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-5 text-xs text-slate-700 leading-relaxed space-y-3">
+              <p className="font-semibold text-slate-800">
+                Apakah Anda yakin ingin membatalkan dan menghapus data dari dokumen unggahan terakhir?
+              </p>
+              
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg font-mono text-[11px] text-slate-600 break-all space-y-1">
+                <span className="font-bold text-slate-400 block text-[9px] uppercase tracking-wider">Berkas Terakhir:</span>
+                <span className="font-bold text-slate-800">{lastBatchId}</span>
+              </div>
+
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 space-y-1.5 font-medium">
+                <p className="font-bold flex items-center gap-1 text-amber-950">
+                  ⚠️ NOTICE KEAMANAN DATA:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-[11px]">
+                  <li><strong>Data BARU</strong> yang baru didaftarkan dari file ini akan DIHAPUS PERMANEN.</li>
+                  <li><strong>Data LAMA</strong> yang sebelumnya ditimpa akan DIJAGA TETAP AMAN (sistem hanya melepas tanda impornya saja agar data manual Anda tidak hilang).</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowRollbackConfirmModal(false)}
+                className="px-4 py-2 bg-white hover:bg-slate-100 active:bg-slate-200 border border-slate-300 text-slate-700 hover:text-slate-900 font-bold text-xs rounded-lg transition-all cursor-pointer"
+              >
+                Batal
+              </button>
+              
+              <button
+                type="button"
+                onClick={handleExecuteRollback}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold text-xs rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-white" />
+                <span>Ya, Hapus Data Impor Terakhir</span>
               </button>
             </div>
           </div>

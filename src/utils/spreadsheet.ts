@@ -788,6 +788,7 @@ export function parseExcelFile(file: File): Promise<Partial<Lead>[]> {
             return '';
           };
 
+          const clientName = getVal(['Nama Klien', 'Client Name', 'Klien', 'Client']) || 'Wibu Sales (Utama)';
           const namaCS = getVal(['Nama CS', 'Nama CS/Sales', 'CS Name', 'CS']);
           const nomorWA = getVal(['Nomor WhatsApp', 'No WA', 'Nomor WA', 'WhatsApp', 'Phone']);
           const namaCustomer = getVal(['Nama Customer', 'Nama Pelanggan', 'Customer Name', 'Customer']);
@@ -818,6 +819,7 @@ export function parseExcelFile(file: File): Promise<Partial<Lead>[]> {
 
           const leadCandidate: Lead = {
             id: `import-${Date.now()}-${idx}`,
+            clientName,
             namaCS: namaCS || 'CS Import',
             nomorWA: nomorWA || '0812000000',
             namaCustomer: namaCustomer || `Customer Import #${idx + 1}`,

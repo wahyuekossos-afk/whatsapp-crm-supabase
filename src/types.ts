@@ -74,6 +74,8 @@ export interface Lead {
   updatedAt: string;
   history: LeadHistoryItem[];
   riwayatRepeatOrder?: string; // Serialized JSON string for Column P in Google Sheets
+  uploadBatch?: string;        // Track which batch this lead was uploaded from (e.g. "Batch - filename - timestamp")
+  isNewUpload?: boolean;       // Flag if this lead was newly created from upload vs updated
 }
 
 export interface CSUser {

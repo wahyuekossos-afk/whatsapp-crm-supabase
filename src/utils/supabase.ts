@@ -248,7 +248,9 @@ export async function dbGetLeads(): Promise<Lead[]> {
       totalInvoice: Number(l.total_invoice || 0),
       updatedAt: l.updated_at,
       history: Array.isArray(l.history) ? l.history : [],
-      riwayatRepeatOrder: l.riwayat_repeat_order || undefined
+      riwayatRepeatOrder: l.riwayat_repeat_order || undefined,
+      uploadBatch: l.upload_batch || undefined,
+      isNewUpload: l.is_new_upload || false
     }));
   } catch (e) {
     console.error('Error fetching Leads from Supabase:', e);
@@ -281,11 +283,75 @@ export async function dbUpsertLead(lead: Lead): Promise<void> {
         total_invoice: lead.totalInvoice,
         updated_at: new Date().toISOString(),
         history: lead.history,
-        riwayat_repeat_order: lead.riwayatRepeatOrder || null
+        riwayat_repeat_order: lead.riwayatRepeatOrder || null,
+        upload_batch: lead.uploadBatch || null,
+        is_new_upload: lead.isNewUpload || false
       });
     if (error) throw error;
   } catch (e) {
     console.error('Error upserting Lead to Supabase:', e);
+    throw e;
+  }
+}
+
+export async function dbBulkUpsertLeads(leads: Lead[]): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+  if (leads.length === 0) return;
+  try {
+    const payload = leads.map(l => ({
+      id: l.id,
+      client_id: l.clientId || null,
+      client_name: l.clientName || null,
+      nama_cs: l.namaCS,
+      nomor_wa: l.nomorWA,
+      nama_customer: l.namaCustomer,
+      kategori_flow: l.kategoriFlow,
+      alasan_lost: l.alasanLost || null,
+      tanggal_masuk: l.tanggalMasuk,
+      jam_masuk: l.jamMasuk,
+      jam_balas: l.jamBalas,
+      lokasi_kota: l.lokasiKota,
+      note_customer: l.noteCustomer,
+      item_order: l.itemOrder,
+      quantity_order: l.quantityOrder,
+      total_invoice: l.totalInvoice,
+      updated_at: new Date().toISOString(),
+      history: l.history,
+      riwayat_repeat_order: l.riwayatRepeatOrder || null,
+      upload_batch: l.uploadBatch || null,
+      is_new_upload: l.isNewUpload || false
+    }));
+    const { error } = await supabase
+      .from('leads')
+      .upsert(payload, { onConflict: 'id' });
+    if (error) throw error;
+  } catch (e) {
+    console.error('Error bulk upserting Leads to Supabase:', e);
+    throw e;
+  }
+}
+
+export async function dbDeleteUploadBatch(batchId: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+  try {
+    // 1. Delete newly created leads of this batch
+    const { error: errDel } = await supabase
+      .from('leads')
+      .delete()
+      .eq('upload_batch', batchId)
+      .eq('is_new_upload', true);
+    if (errDel) throw errDel;
+
+    // 2. For updated leads, clear their upload_batch and is_new_upload markers so they are safe
+    const { error: errUpd } = await supabase
+      .from('leads')
+      .update({ upload_batch: null, is_new_upload: false })
+      .eq('upload_batch', batchId);
+    if (errUpd) throw errUpd;
+  } catch (e) {
+    console.error('Error deleting upload batch from Supabase:', e);
     throw e;
   }
 }
@@ -747,7 +813,9 @@ CREATE TABLE IF NOT EXISTS leads (
     total_invoice NUMERIC DEFAULT 0,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     history JSONB DEFAULT '[]'::jsonb,
-    riwayat_repeat_order TEXT
+    riwayat_repeat_order TEXT,
+    upload_batch TEXT,
+    is_new_upload BOOLEAN DEFAULT false
 );
 
 -- 4. Tabel KPI Targets
