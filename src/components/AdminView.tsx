@@ -61,6 +61,7 @@ interface AdminViewProps {
   onDeleteMetaChat?: (tanggal: string, namaCS: string) => Promise<boolean>;
   onSyncAllMetaChats?: () => Promise<boolean>;
   onBulkImportLeads?: (parsed: Partial<Lead>[], filename: string) => Promise<{ added: number; updated: number; batchId: string }>;
+  onUploadBatchToSupabase?: (batchId: string) => Promise<{ success: boolean; uploadedCount: number; message: string }>;
   onDeleteLastImportBatch?: () => Promise<{ success: boolean; deletedCount: number; clearedCount: number; message: string }>;
   onDeleteLeadsByDateRange?: (startDate: string, endDate: string) => Promise<{ success: boolean; deletedCount: number; message: string }>;
 }
@@ -97,6 +98,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   onDeleteMetaChat,
   onSyncAllMetaChats,
   onBulkImportLeads,
+  onUploadBatchToSupabase,
   onDeleteLastImportBatch,
   onDeleteLeadsByDateRange,
 }) => {
@@ -125,6 +127,11 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [showRollbackConfirmModal, setShowRollbackConfirmModal] = useState(false);
   const [pendingFile, setPendingFile] = useState<{ file: File; rowsCount: number; parsed: Partial<Lead>[] } | null>(null);
 
+  // Split-flow state indicators
+  const [stagedBatchId, setStagedBatchId] = useState<string | null>(null);
+  const [localSaveSuccess, setLocalSaveSuccess] = useState<string | null>(null);
+  const [supabaseSaveSuccess, setSupabaseSaveSuccess] = useState<string | null>(null);
+
   // Date Range Deletion States
   const [deleteStartDate, setDeleteStartDate] = useState<string>('');
   const [deleteEndDate, setDeleteEndDate] = useState<string>('');
@@ -135,6 +142,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
     setIsUploading(true);
     setUploadError(null);
     setUploadSuccess(null);
+    setLocalSaveSuccess(null);
+    setSupabaseSaveSuccess(null);
     try {
       const parsed = await parseExcelFile(file);
       if (!parsed || parsed.length === 0) {
@@ -146,36 +155,77 @@ export const AdminView: React.FC<AdminViewProps> = ({
         rowsCount: parsed.length,
         parsed
       });
-      onShowToast(`📁 Berkas '${file.name}' terbaca. Klik tombol "Upload ke Supabase" di bawah.`);
+      onShowToast(`📁 Berkas '${file.name}' tervalidasi. Pilih aksi simpan di bawah.`);
     } catch (err: any) {
       console.error(err);
-      setUploadError(err.message || 'Gagal memproses file Excel/CSV. Pastikan format kolom sesuai template.');
+      setUploadError(err.message || 'Gagal memproses file Excel/CSV. Pastikan format kolom sesuai.');
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleCommitUploadToSupabase = async () => {
+  const handleSaveToLocal = async () => {
     if (!pendingFile || !onBulkImportLeads) return;
     setIsUploading(true);
     setUploadError(null);
-    setUploadSuccess(null);
+    setLocalSaveSuccess(null);
+    setSupabaseSaveSuccess(null);
     try {
       const { file, parsed } = pendingFile;
       const res = await onBulkImportLeads(parsed, file.name);
       
-      const successMsg = `🎉 DATA SUDAH TERUPLOAD KE DATABASE SUPABASE!\n` +
-        `Dokumen '${file.name}' berhasil diunggah secara realtime.\n` +
-        `- ${res.added} data baru berhasil didaftarkan.\n` +
-        `- ${res.updated} data lama berhasil ditimpa (Smart Upsert).`;
-        
-      setUploadSuccess(successMsg);
+      setStagedBatchId(res.batchId);
       setLastBatchId(res.batchId);
-      setPendingFile(null); // clear staging on success
-      onShowToast(`🚀 Data berhasil terunggah ke database Supabase!`);
+      setLocalSaveSuccess(`✅ Sukses menyimpan ${res.added} baris data leads ke memori lokal! Silakan periksa kecocokan data Anda pada spreadsheet/dashboard. Klik tombol "Upload ke Supabase" jika sudah sesuai.`);
+      setPendingFile(null); // clear raw file staging
+      onShowToast(`✅ Berhasil menyimpan data secara lokal.`);
+    } catch (err: any) {
+      console.error(err);
+      setUploadError(err.message || 'Gagal menyimpan data ke lokal.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleUploadStagedToSupabase = async () => {
+    const batchToUpload = stagedBatchId || lastBatchId;
+    if (!batchToUpload || !onUploadBatchToSupabase) {
+      onShowToast(`⚠️ Tidak ada data baru hasil import yang siap diupload.`);
+      return;
+    }
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const res = await onUploadBatchToSupabase(batchToUpload);
+      if (res.success) {
+        setSupabaseSaveSuccess(`🎉 NOTICE: DATA BERHASIL TERUPLOAD!\n\n${res.message}`);
+        setLocalSaveSuccess(null); // clear local staging banner
+        setStagedBatchId(null); // cleared on success
+        onShowToast(`🚀 Data berhasil terunggah ke database Supabase!`);
+      }
     } catch (err: any) {
       console.error(err);
       setUploadError(err.message || 'Gagal mengunggah data ke database Supabase.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleUndoStagedLocal = async () => {
+    if (!onDeleteLastImportBatch) return;
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const res = await onDeleteLastImportBatch();
+      if (res.success) {
+        setLocalSaveSuccess(null);
+        setSupabaseSaveSuccess(null);
+        setStagedBatchId(null);
+        onShowToast(`🗑️ Data lokal berhasil dihapus!`);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setUploadError(err.message || 'Gagal membatalkan data lokal.');
     } finally {
       setIsUploading(false);
     }
@@ -1068,10 +1118,10 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">
-                    Upload / Import Data Leads (Smart Upsert)
+                    Upload / Import Data Leads
                   </h3>
                   <p className="text-[11px] text-slate-400 font-medium">
-                    Unggah dokumen CSV/Excel untuk tambah/perbarui data leads dengan pola tanggal mundur
+                    Unggah dokumen CSV/Excel untuk memproses data apa adanya ke memori lokal sebelum disimpan ke cloud Supabase
                   </p>
                 </div>
               </div>
@@ -1086,19 +1136,19 @@ export const AdminView: React.FC<AdminViewProps> = ({
               </button>
             </div>
 
-            {/* Smart Upsert Method Explain Banner */}
-            <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-lg text-xs text-blue-950 space-y-1.5">
-              <p className="font-bold flex items-center gap-1">
+            {/* Upload Method Info Banner */}
+            <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-lg text-xs text-blue-950 space-y-1">
+              <p className="font-bold flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
-                <span>Metode A: Sistem Timpa Otomatis (Smart Upsert)</span>
+                <span>Metode B: Impor Data Apa Adanya (No Overwrite)</span>
               </p>
               <p className="leading-relaxed font-medium">
-                Sistem mendeteksi <strong>Nomor WhatsApp</strong> sebagai kunci unik. Jika data dengan nomor yang sama ditemukan, data lama akan ditimpa (overwritten) secara otomatis. Jika tidak ada, data baru akan didaftarkan. Sempurna untuk mengoreksi kesalahan ketik tanpa menduplikasi data!
+                Nomor WhatsApp tidak digunakan sebagai kunci penimpa. Semua data yang diunggah akan disimpan **apa adanya** sebagai baris baru tanpa menimpa data yang lama.
               </p>
             </div>
 
             {/* Uploader UI depending on staging file */}
-            {!pendingFile ? (
+            {!pendingFile && !stagedBatchId && (
               /* Drag & Drop Upload Zone */
               <div
                 onDragEnter={handleDrag}
@@ -1135,19 +1185,21 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   </div>
                 </label>
               </div>
-            ) : (
-              /* Staging Preview & Commit Button */
-              <div className="p-4 bg-blue-50/30 border border-blue-200 rounded-xl space-y-4 animate-scaleIn">
+            )}
+
+            {/* STAGE 1: File parsed & ready to be saved locally */}
+            {pendingFile && (
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4 animate-scaleIn">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
                     <span className="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 text-[9px] font-extrabold uppercase rounded">
-                      Berkas Terbaca &amp; Siap Upload
+                      Berkas Terbaca (Verifikasi Kolom Cocok)
                     </span>
                     <h4 className="text-xs font-bold text-slate-800 break-all">
                       {pendingFile.file.name}
                     </h4>
                     <p className="text-[11px] text-slate-500 font-medium">
-                      Total terdeteksi: <strong className="text-blue-700 font-bold">{pendingFile.rowsCount} baris data leads</strong>.
+                      Total baris: <strong className="text-blue-700 font-bold">{pendingFile.rowsCount} data leads</strong>.
                     </p>
                   </div>
                   
@@ -1160,19 +1212,58 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   </button>
                 </div>
 
-                <div className="p-3 bg-white border border-blue-100 rounded-lg text-xs text-slate-600 leading-relaxed font-medium">
-                  💡 Klik tombol di bawah ini untuk menyimpan dan menyinkronkan seluruh baris data di atas secara langsung ke cloud database Supabase Anda.
+                <div className="p-3 bg-blue-50/40 border border-blue-100 rounded-lg text-xs text-blue-900 leading-relaxed font-medium">
+                  💡 Format kolom tervalidasi dan match dengan tabel database Supabase. Klik tombol di bawah ini untuk menyimpan data ini ke **memori lokal (Lokal Browser)** terlebih dahulu agar Anda dapat memeriksa kesesuaiannya sebelum disimpan ke cloud.
                 </div>
 
                 <button
                   type="button"
-                  onClick={handleCommitUploadToSupabase}
+                  onClick={handleSaveToLocal}
                   disabled={isUploading}
-                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-blue-300 text-white font-bold text-xs rounded-lg shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full py-2.5 bg-slate-800 hover:bg-slate-900 active:bg-black text-white font-bold text-xs rounded-lg shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
-                  <Database className={`w-4 h-4 text-white ${isUploading ? 'animate-spin' : ''}`} />
-                  <span>{isUploading ? 'Menyimpan ke Supabase...' : 'Simpan & Upload ke Database Supabase'}</span>
+                  <Database className="w-4 h-4 text-white" />
+                  <span>Simpan ke Lokal</span>
                 </button>
+              </div>
+            )}
+
+            {/* STAGE 2: Data stored in local, ready for Supabase or deletion rollback */}
+            {stagedBatchId && localSaveSuccess && (
+              <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-xl space-y-4 animate-scaleIn">
+                <div className="space-y-1">
+                  <span className="inline-block px-2 py-0.5 bg-amber-100 text-amber-800 text-[9px] font-extrabold uppercase rounded">
+                    Data Berada Di Memori Lokal
+                  </span>
+                  <p className="text-xs font-semibold text-slate-700">
+                    Sesi Batch: <strong className="font-mono text-slate-900">{stagedBatchId}</strong>
+                  </p>
+                  <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
+                    {localSaveSuccess}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleUndoStagedLocal}
+                    disabled={isUploading}
+                    className="py-2.5 bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-700 border border-red-200 hover:border-red-300 font-bold text-xs rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Trash2 className="w-4 h-4 text-red-600" />
+                    <span>Hapus Data Lokal Baru Ini</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleUploadStagedToSupabase}
+                    disabled={isUploading}
+                    className="py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-xs rounded-lg shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Database className={`w-4 h-4 text-white ${isUploading ? 'animate-spin' : ''}`} />
+                    <span>Upload ke Database Supabase</span>
+                  </button>
+                </div>
               </div>
             )}
 
@@ -1187,41 +1278,30 @@ export const AdminView: React.FC<AdminViewProps> = ({
               </div>
             )}
 
-            {uploadSuccess && (
+            {supabaseSaveSuccess && (
               <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-xs text-green-800 flex items-start gap-2.5 animate-fadeIn">
                 <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
                 <div className="whitespace-pre-line font-medium leading-relaxed">
                   <p className="font-bold text-green-950 text-xs">NOTICE: DATA BERHASIL TERUPLOAD!</p>
-                  <div className="text-[11px] text-green-800 mt-1">{uploadSuccess}</div>
+                  <div className="text-[11px] text-green-800 mt-1">{supabaseSaveSuccess}</div>
                 </div>
               </div>
             )}
 
-            {/* Undo / Rollback Section */}
-            {lastBatchId && (
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      Riwayat Unggahan Terakhir
-                    </p>
-                    <p className="font-bold text-slate-800 break-all flex items-center gap-1.5 pr-2">
-                      <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
-                      {lastBatchId}
-                    </p>
-                  </div>
-                  
-                  <button
-                    type="button"
-                    onClick={() => setShowRollbackConfirmModal(true)}
-                    className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 hover:border-red-300 font-bold text-[11px] rounded-lg transition-all cursor-pointer flex items-center gap-1 shrink-0"
-                    title="Undo uploader: Batalkan unggahan file ini"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-red-600" />
-                    <span>Hapus Impor Terakhir</span>
-                  </button>
-                </div>
-              </div>
+            {/* Back to dropzone button if we just succeeded or cancelled everything */}
+            {(supabaseSaveSuccess || (!pendingFile && !stagedBatchId)) && stagedBatchId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingFile(null);
+                  setStagedBatchId(null);
+                  setLocalSaveSuccess(null);
+                  setSupabaseSaveSuccess(null);
+                }}
+                className="w-full py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-all"
+              >
+                Unggah File Baru Lagi
+              </button>
             )}
           </div>
 

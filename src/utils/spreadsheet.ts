@@ -778,6 +778,26 @@ export function parseExcelFile(file: File): Promise<Partial<Lead>[]> {
         const workbook = XLSX.read(data, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Extract headers and check if they match the required database layout
+        const headersRaw = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] as any[];
+        const fileHeaders = (headersRaw || []).map(h => String(h).trim().toLowerCase());
+        
+        const hasWhatsApp = fileHeaders.some(h => ['nomor whatsapp', 'no wa', 'nomor wa', 'whatsapp', 'phone'].includes(h));
+        const hasCustomer = fileHeaders.some(h => ['nama customer', 'nama pelanggan', 'customer name', 'customer'].includes(h));
+        const hasDate = fileHeaders.some(h => ['tanggal leads masuk', 'tanggal masuk', 'tanggal', 'date'].includes(h));
+        const hasCS = fileHeaders.some(h => ['nama cs', 'nama cs/sales', 'cs name', 'cs'].includes(h));
+
+        if (!hasWhatsApp || !hasCustomer || !hasDate || !hasCS) {
+          const missing = [];
+          if (!hasWhatsApp) missing.push("Nomor WhatsApp");
+          if (!hasCustomer) missing.push("Nama Customer");
+          if (!hasDate) missing.push("Tanggal Leads Masuk");
+          if (!hasCS) missing.push("Nama CS");
+          
+          throw new Error(`Format kolom dokumen tidak cocok dengan database Supabase. Silakan unduh template CSV di atas. Kolom penting yang tidak ditemukan: ${missing.join(', ')}`);
+        }
+
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
 
         const parsedLeads: Partial<Lead>[] = jsonData.map((row: any, idx: number) => {

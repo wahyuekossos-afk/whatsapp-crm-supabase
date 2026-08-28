@@ -915,36 +915,96 @@ export default function App() {
   };
 
   // Handle Add New Lead
-  const handleSaveNewLead = (newLead: Lead) => {
+  const handleSaveNewLead = async (newLead: Lead) => {
     const updated = [newLead, ...leads];
     setLeads(updated);
+    
+    let supabaseSuccess = true;
+    let supabaseErrorMsg = '';
+
     if (supabaseConfig.enabled) {
-      dbUpsertLead(newLead).catch(err => console.error(err));
+      try {
+        await dbUpsertLead(newLead);
+      } catch (err: any) {
+        supabaseSuccess = false;
+        supabaseErrorMsg = err.message || JSON.stringify(err);
+        console.error('Failed to save to Supabase:', err);
+      }
     }
+
     autoSyncPush(updated);
-    showToast(`✅ Lead baru '${newLead.namaCustomer}' berhasil disimpan & dicatat ke Google Sheet!`);
+
+    if (supabaseConfig.enabled) {
+      if (supabaseSuccess) {
+        showToast(`✅ Lead baru '${newLead.namaCustomer}' berhasil disimpan ke Supabase Cloud & Google Sheet!`);
+      } else {
+        showToast(`⚠️ Tersimpan di lokal, tapi GAGAL menyimpan ke Supabase: ${supabaseErrorMsg}`);
+      }
+    } else {
+      showToast(`✅ Lead baru '${newLead.namaCustomer}' berhasil disimpan & dicatat ke Google Sheet!`);
+    }
   };
 
   // Handle Update Existing Lead
-  const handleSaveUpdatedLead = (updatedLead: Lead) => {
+  const handleSaveUpdatedLead = async (updatedLead: Lead) => {
     const updated = leads.map((l) => (l.id === updatedLead.id ? updatedLead : l));
     setLeads(updated);
+
+    let supabaseSuccess = true;
+    let supabaseErrorMsg = '';
+
     if (supabaseConfig.enabled) {
-      dbUpsertLead(updatedLead).catch(err => console.error(err));
+      try {
+        await dbUpsertLead(updatedLead);
+      } catch (err: any) {
+        supabaseSuccess = false;
+        supabaseErrorMsg = err.message || JSON.stringify(err);
+        console.error('Failed to update in Supabase:', err);
+      }
     }
+
     autoSyncPush(updated);
-    showToast(`✅ Progres lead '${updatedLead.namaCustomer}' berhasil diperbarui di Google Sheet!`);
+
+    if (supabaseConfig.enabled) {
+      if (supabaseSuccess) {
+        showToast(`✅ Progres lead '${updatedLead.namaCustomer}' berhasil diperbarui di Supabase & Google Sheet!`);
+      } else {
+        showToast(`⚠️ Terperbarui di lokal, tapi GAGAL sinkron ke Supabase: ${supabaseErrorMsg}`);
+      }
+    } else {
+      showToast(`✅ Progres lead '${updatedLead.namaCustomer}' berhasil diperbarui di Google Sheet!`);
+    }
   };
 
   // Handle Delete Lead
-  const handleDeleteLead = (id: string) => {
+  const handleDeleteLead = async (id: string) => {
     const updated = leads.filter((l) => l.id !== id);
     setLeads(updated);
+
+    let supabaseSuccess = true;
+    let supabaseErrorMsg = '';
+
     if (supabaseConfig.enabled) {
-      dbDeleteLead(id).catch(err => console.error(err));
+      try {
+        await dbDeleteLead(id);
+      } catch (err: any) {
+        supabaseSuccess = false;
+        supabaseErrorMsg = err.message || JSON.stringify(err);
+        console.error('Failed to delete in Supabase:', err);
+      }
     }
+
     autoSyncPush(updated);
-    showToast('🗑️ Lead telah dihapus & diperbarui di Google Sheet.');
+
+    if (supabaseConfig.enabled) {
+      if (supabaseSuccess) {
+        showToast('🗑️ Lead telah dihapus dari Supabase & Google Sheet.');
+      } else {
+        showToast(`⚠️ Terhapus di lokal, tapi GAGAL hapus di Supabase: ${supabaseErrorMsg}`);
+      }
+    } else {
+      showToast('🗑️ Lead telah dihapus & diperbarui di Google Sheet.');
+    }
   };
 
   // Export handlers
@@ -996,161 +1056,107 @@ export default function App() {
     }
   };
 
-  // Handle bulk import with smart upsert matching by nomorWA
+  // Handle bulk import as-is ("apa adanya", no phone matching/overwrite) and save to local state only
   const handleBulkUpsertLeads = async (parsed: Partial<Lead>[], filename: string): Promise<{ added: number; updated: number; batchId: string }> => {
     const batchId = `Batch - ${filename} - ${new Date().toLocaleString('id-ID', { hour12: false })}`;
     
-    // Create deep copies to prevent state mutation issues
     let currentLeads = [...leads];
     let addedCount = 0;
-    let updatedCount = 0;
-    const leadsToUpsert: Lead[] = [];
+    const leadsToImport: Lead[] = [];
 
     parsed.forEach((p, idx) => {
       const cleanNomorWA = String(p.nomorWA || '0812000000').trim();
       
-      // 1. Find if a lead with the same phone number already exists
-      const existingIdx = currentLeads.findIndex(
-        (l) => l.nomorWA.replace(/\D/g, '') === cleanNomorWA.replace(/\D/g, '')
-      );
-
-      if (existingIdx !== -1) {
-        // Mode A: Smart Upsert (Timpa Otomatis)
-        const existingLead = currentLeads[existingIdx];
-        
-        // Construct the updated lead
-        const updatedLead: Lead = {
-          ...existingLead,
-          clientName: p.clientName || existingLead.clientName || 'Wibu Sales (Utama)',
-          namaCS: p.namaCS || existingLead.namaCS,
-          nomorWA: cleanNomorWA,
-          namaCustomer: p.namaCustomer || existingLead.namaCustomer,
-          kategoriFlow: p.kategoriFlow || existingLead.kategoriFlow,
-          alasanLost: p.alasanLost !== undefined ? p.alasanLost : existingLead.alasanLost,
-          tanggalMasuk: p.tanggalMasuk || existingLead.tanggalMasuk,
-          jamMasuk: p.jamMasuk || existingLead.jamMasuk,
-          jamBalas: p.jamBalas || existingLead.jamBalas,
-          lokasiKota: p.lokasiKota || existingLead.lokasiKota,
-          noteCustomer: p.noteCustomer || existingLead.noteCustomer,
-          itemOrder: p.itemOrder || existingLead.itemOrder,
-          quantityOrder: p.quantityOrder !== undefined ? Number(p.quantityOrder) : existingLead.quantityOrder,
-          totalInvoice: p.totalInvoice !== undefined ? Number(p.totalInvoice) : existingLead.totalInvoice,
-          updatedAt: new Date().toISOString(),
-          uploadBatch: batchId,
-          isNewUpload: false // Marked as updated, NOT newly created
-        };
-
-        // Add import note to history log
-        const cleanTanggal = normalizeDateString(updatedLead.tanggalMasuk);
-        const cleanJam = normalizeTimeString(updatedLead.jamMasuk);
-        const logTimestamp = formatHistoryTimestamp(`${cleanTanggal} ${cleanJam}`);
-        updatedLead.history = [
-          ...updatedLead.history,
+      const newLead: Lead = {
+        id: p.id || `imp-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
+        clientName: p.clientName || 'Wibu Sales (Utama)',
+        namaCS: p.namaCS || currentCS.nama,
+        nomorWA: cleanNomorWA,
+        namaCustomer: p.namaCustomer || `Customer Import #${idx + 1}`,
+        kategoriFlow: p.kategoriFlow || 'New Leads',
+        alasanLost: p.alasanLost || '',
+        tanggalMasuk: p.tanggalMasuk || new Date().toISOString().split('T')[0],
+        jamMasuk: p.jamMasuk || '09:00',
+        jamBalas: p.jamBalas || '09:05',
+        lokasiKota: p.lokasiKota || 'Jakarta',
+        noteCustomer: p.noteCustomer || 'Diimport dari file spreadsheet',
+        itemOrder: p.itemOrder || 'Produk',
+        quantityOrder: Number(p.quantityOrder || 1),
+        totalInvoice: Number(p.totalInvoice || 0),
+        updatedAt: new Date().toISOString(),
+        history: p.history || [
           {
-            id: `h-imp-upd-${Date.now()}-${idx}`,
-            timestamp: logTimestamp,
-            csName: updatedLead.namaCS || 'System',
-            toFlow: updatedLead.kategoriFlow,
-            note: `Diperbarui via upload file [${filename}] (Smart Upsert)`
+            id: `h-imp-init-${Date.now()}-${idx}`,
+            timestamp: formatHistoryTimestamp(`${p.tanggalMasuk || new Date().toISOString().split('T')[0]} ${p.jamMasuk || '09:00'}`),
+            csName: p.namaCS || currentCS.nama,
+            toFlow: p.kategoriFlow || 'New Leads',
+            note: `Dicatat via upload file [${filename}]`
           }
-        ];
+        ],
+        uploadBatch: batchId,
+        isNewUpload: true
+      };
 
-        currentLeads[existingIdx] = updatedLead;
-        leadsToUpsert.push(updatedLead);
-        updatedCount++;
-      } else {
-        // Match not found, create a brand new lead
-        const newLead: Lead = {
-          id: p.id || `imp-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 7)}`,
-          clientName: p.clientName || 'Wibu Sales (Utama)',
-          namaCS: p.namaCS || currentCS.nama,
-          nomorWA: cleanNomorWA,
-          namaCustomer: p.namaCustomer || `Customer Import #${idx + 1}`,
-          kategoriFlow: p.kategoriFlow || 'New Leads',
-          alasanLost: p.alasanLost || '',
-          tanggalMasuk: p.tanggalMasuk || new Date().toISOString().split('T')[0],
-          jamMasuk: p.jamMasuk || '09:00',
-          jamBalas: p.jamBalas || '09:05',
-          lokasiKota: p.lokasiKota || 'Jakarta',
-          noteCustomer: p.noteCustomer || 'Diimport dari file spreadsheet',
-          itemOrder: p.itemOrder || 'Produk',
-          quantityOrder: Number(p.quantityOrder || 1),
-          totalInvoice: Number(p.totalInvoice || 0),
-          updatedAt: new Date().toISOString(),
-          history: p.history || [
-            {
-              id: `h-imp-init-${Date.now()}-${idx}`,
-              timestamp: formatHistoryTimestamp(`${p.tanggalMasuk || new Date().toISOString().split('T')[0]} ${p.jamMasuk || '09:00'}`),
-              csName: p.namaCS || currentCS.nama,
-              toFlow: p.kategoriFlow || 'New Leads',
-              note: `Dicatat via upload file [${filename}]`
-            }
-          ],
-          uploadBatch: batchId,
-          isNewUpload: true // Marked as newly created
-        };
-
-        currentLeads = [newLead, ...currentLeads];
-        leadsToUpsert.push(newLead);
-        addedCount++;
-      }
+      leadsToImport.push(newLead);
+      addedCount++;
     });
 
+    const updated = [...leadsToImport, ...currentLeads];
+
     // Commit to state & LocalStorage
-    setLeads(currentLeads);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(currentLeads));
+    setLeads(updated);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     localStorage.setItem('crm_last_upload_batch', batchId);
 
-    // Sync to Supabase in bulk if enabled
-    if (supabaseConfig.enabled) {
-      try {
-        await dbBulkUpsertLeads(leadsToUpsert);
-      } catch (err: any) {
-        console.error('Error syncing uploaded leads to Supabase:', err);
-        showToast('⚠️ Data diunggah ke lokal, tetapi gagal sinkronisasi otomatis ke Supabase.');
-      }
-    }
-
     // Trigger background push to sheets
-    autoSyncPush(currentLeads);
+    autoSyncPush(updated);
 
-    return { added: addedCount, updated: updatedCount, batchId };
+    return { added: addedCount, updated: 0, batchId };
   };
 
-  // Rollback function to undo only the last imported batch's newly created leads and safely demark updated leads
+  // Upload a specific batch of imported leads from local storage to Supabase database
+  const handleUploadBatchToSupabase = async (batchId: string): Promise<{ success: boolean; uploadedCount: number; message: string }> => {
+    if (!supabaseConfig.enabled) {
+      return { success: false, uploadedCount: 0, message: 'Koneksi database Supabase belum diaktifkan.' };
+    }
+    
+    const leadsToUpload = leads.filter(l => l.uploadBatch === batchId);
+    if (leadsToUpload.length === 0) {
+      return { success: false, uploadedCount: 0, message: 'Tidak ada data lokal baru yang siap diunggah untuk batch ini.' };
+    }
+
+    try {
+      await dbBulkUpsertLeads(leadsToUpload);
+      return {
+        success: true,
+        uploadedCount: leadsToUpload.length,
+        message: `Berhasil menyimpan & menyinkronkan seluruh ${leadsToUpload.length} baris data leads ke cloud database Supabase!`
+      };
+    } catch (err: any) {
+      console.error('Error uploading batch to Supabase:', err);
+      throw new Error(err.message || 'Gagal mengunggah data ke database Supabase.');
+    }
+  };
+
+  // Rollback function to undo only the last imported batch's newly created leads from local and Supabase (if synced)
   const handleDeleteLastImportBatch = async (): Promise<{ success: boolean; deletedCount: number; clearedCount: number; message: string }> => {
     const lastBatchId = localStorage.getItem('crm_last_upload_batch');
     if (!lastBatchId) {
-      return { success: false, deletedCount: 0, clearedCount: 0, message: 'Tidak ada riwayat berkas unggahan terakhir yang ditemukan.' };
+      return { success: false, deletedCount: 0, clearedCount: 0, message: 'Tidak ada riwayat berkas unggahan lokal terbaru yang ditemukan.' };
     }
 
-    // 1. Identify records to delete (newly created) and records to update (overwritten)
-    const newLeadsToDelete = leads.filter((l) => l.uploadBatch === lastBatchId && l.isNewUpload === true);
-    const updatedLeadsToDemark = leads.filter((l) => l.uploadBatch === lastBatchId && l.isNewUpload !== true);
+    const leadsToDelete = leads.filter((l) => l.uploadBatch === lastBatchId);
+    const remainingLeads = leads.filter((l) => l.uploadBatch !== lastBatchId);
 
-    const newLeadsToDeleteIds = new Set(newLeadsToDelete.map(l => l.id));
+    const deletedCount = leadsToDelete.length;
 
-    // 2. Perform rollback on client-side state
-    const rolledBackLeads = leads
-      .filter((l) => !newLeadsToDeleteIds.has(l.id)) // Remove new leads completely
-      .map((l) => {
-        if (l.uploadBatch === lastBatchId) {
-          // Demark/clean updated leads safely
-          return {
-            ...l,
-            uploadBatch: undefined,
-            isNewUpload: undefined
-          };
-        }
-        return l;
-      });
-
-    setLeads(rolledBackLeads);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(rolledBackLeads));
+    // Perform rollback on client-side state
+    setLeads(remainingLeads);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(remainingLeads));
     localStorage.removeItem('crm_last_upload_batch');
 
-    // 3. Perform rollback on Supabase if enabled
-    if (supabaseConfig.enabled) {
+    // Perform rollback on Supabase if enabled
+    if (supabaseConfig.enabled && deletedCount > 0) {
       try {
         await dbDeleteUploadBatch(lastBatchId);
       } catch (err: any) {
@@ -1159,13 +1165,13 @@ export default function App() {
     }
 
     // Sync back to Google Sheets if connected
-    autoSyncPush(rolledBackLeads);
+    autoSyncPush(remainingLeads);
 
     return {
       success: true,
-      deletedCount: newLeadsToDelete.length,
-      clearedCount: updatedLeadsToDemark.length,
-      message: `Berhasil membatalkan unggahan berkas: ${lastBatchId}`
+      deletedCount,
+      clearedCount: 0,
+      message: `Sukses membatalkan dan menghapus ${deletedCount} data leads lokal dari berkas unggahan terakhir.`
     };
   };
 
@@ -1423,6 +1429,7 @@ export default function App() {
             onDeleteMetaChat={handleDeleteMetaChatItem}
             onSyncAllMetaChats={handleSyncAllMetaChats}
             onBulkImportLeads={handleBulkUpsertLeads}
+            onUploadBatchToSupabase={handleUploadBatchToSupabase}
             onDeleteLastImportBatch={handleDeleteLastImportBatch}
             onDeleteLeadsByDateRange={handleDeleteLeadsByDateRange}
           />
