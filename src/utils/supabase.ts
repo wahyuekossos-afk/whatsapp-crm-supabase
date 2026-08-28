@@ -224,12 +224,31 @@ export async function dbGetLeads(): Promise<Lead[]> {
   const supabase = getSupabaseClient();
   if (!supabase) return [];
   try {
-    const { data, error } = await supabase
-      .from('leads')
-      .select('*');
+    let allData: any[] = [];
+    let start = 0;
+    const chunkSize = 1000;
+    let hasMore = true;
 
-    if (error) throw error;
-    return (data || []).map(l => ({
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .range(start, start + chunkSize - 1);
+
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        hasMore = false;
+      } else {
+        allData = [...allData, ...data];
+        if (data.length < chunkSize) {
+          hasMore = false;
+        } else {
+          start += chunkSize;
+        }
+      }
+    }
+
+    return allData.map(l => ({
       id: l.id,
       clientId: l.client_id || undefined,
       clientName: l.client_name || undefined,
