@@ -250,7 +250,7 @@ export async function dbGetLeads(): Promise<Lead[]> {
       history: Array.isArray(l.history) ? l.history : [],
       riwayatRepeatOrder: l.riwayat_repeat_order || undefined,
       uploadBatch: l.upload_batch || undefined,
-      isNewUpload: l.is_new_upload || false
+      isNewUpload: false
     }));
   } catch (e) {
     console.error('Error fetching Leads from Supabase:', e);
@@ -284,8 +284,7 @@ export async function dbUpsertLead(lead: Lead): Promise<void> {
         updated_at: new Date().toISOString(),
         history: lead.history,
         riwayat_repeat_order: lead.riwayatRepeatOrder || null,
-        upload_batch: lead.uploadBatch || null,
-        is_new_upload: lead.isNewUpload || false
+        upload_batch: lead.uploadBatch || null
       });
     if (error) throw error;
   } catch (e) {
@@ -320,7 +319,6 @@ export async function dbBulkUpsertLeads(leads: Lead[]): Promise<void> {
       history: l.history,
       riwayat_repeat_order: l.riwayatRepeatOrder || null,
       upload_batch: l.uploadBatch || null,
-      is_new_upload: l.isNewUpload || false
     }));
     const { error } = await supabase
       .from('leads')
