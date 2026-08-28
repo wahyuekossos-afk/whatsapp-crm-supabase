@@ -33,6 +33,7 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
   const [kategoriFlow, setKategoriFlow] = useState<FlowCategory>(lead.kategoriFlow);
   const [namaCustomer, setNamaCustomer] = useState(lead.namaCustomer || '');
   const [nomorWA, setNomorWA] = useState(lead.nomorWA || '');
+  const [tanggalMasuk, setTanggalMasuk] = useState(lead.tanggalMasuk || '');
   const [alasanLost, setAlasanLost] = useState<LostReason | string>(lead.alasanLost || '');
   const [jamBalas, setJamBalas] = useState(lead.jamBalas || '');
   const [lokasiKota, setLokasiKota] = useState(lead.lokasiKota || '');
@@ -61,6 +62,7 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
       setKategoriFlow(lead.kategoriFlow);
       setNamaCustomer(lead.namaCustomer || '');
       setNomorWA(lead.nomorWA || '');
+      setTanggalMasuk(lead.tanggalMasuk || '');
       setAlasanLost(lead.alasanLost || '');
       setJamBalas(lead.jamBalas || '');
       setLokasiKota(lead.lokasiKota || '');
@@ -258,6 +260,7 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
       ...lead, // Preserves other fields
       namaCustomer,
       nomorWA: nomorWA.trim(),
+      tanggalMasuk,
       kategoriFlow,
       alasanLost: kategoriFlow === 'Lost' ? alasanLost : '',
       jamBalas,
@@ -377,10 +380,15 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
               </div>
 
               <div>
-                <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                  <Lock className="w-3 h-3 text-slate-400 shrink-0" /> Tanggal Masuk
+                <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
+                  📅 Tanggal Masuk
                 </span>
-                <p className="font-semibold text-slate-700 text-xs mt-1.5">{lead.tanggalMasuk}</p>
+                <input
+                  type="date"
+                  value={tanggalMasuk}
+                  onChange={(e) => setTanggalMasuk(e.target.value)}
+                  className="w-full px-2 py-1 text-xs bg-white border border-slate-300 rounded-md font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                />
               </div>
             </div>
 
