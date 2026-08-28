@@ -62,6 +62,7 @@ interface AdminViewProps {
   onSyncAllMetaChats?: () => Promise<boolean>;
   onBulkImportLeads?: (parsed: Partial<Lead>[], filename: string) => Promise<{ added: number; updated: number; batchId: string }>;
   onDeleteLastImportBatch?: () => Promise<{ success: boolean; deletedCount: number; clearedCount: number; message: string }>;
+  onDeleteLeadsByDateRange?: (startDate: string, endDate: string) => Promise<{ success: boolean; deletedCount: number; message: string }>;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({
@@ -97,6 +98,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   onSyncAllMetaChats,
   onBulkImportLeads,
   onDeleteLastImportBatch,
+  onDeleteLeadsByDateRange,
 }) => {
   // All client names list
   const allClientNames = useMemo(() => {
@@ -121,9 +123,15 @@ export const AdminView: React.FC<AdminViewProps> = ({
     return localStorage.getItem('crm_last_upload_batch');
   });
   const [showRollbackConfirmModal, setShowRollbackConfirmModal] = useState(false);
+  const [pendingFile, setPendingFile] = useState<{ file: File; rowsCount: number; parsed: Partial<Lead>[] } | null>(null);
+
+  // Date Range Deletion States
+  const [deleteStartDate, setDeleteStartDate] = useState<string>('');
+  const [deleteEndDate, setDeleteEndDate] = useState<string>('');
+  const [showDateDeleteModal, setShowDateDeleteModal] = useState<boolean>(false);
+  const [dateDeleteResult, setDateDeleteResult] = useState<string | null>(null);
 
   const handleProcessFile = async (file: File) => {
-    if (!onBulkImportLeads) return;
     setIsUploading(true);
     setUploadError(null);
     setUploadSuccess(null);
@@ -133,18 +141,41 @@ export const AdminView: React.FC<AdminViewProps> = ({
         throw new Error('File kosong atau tidak memiliki data yang valid.');
       }
       
+      setPendingFile({
+        file,
+        rowsCount: parsed.length,
+        parsed
+      });
+      onShowToast(`📁 Berkas '${file.name}' terbaca. Klik tombol "Upload ke Supabase" di bawah.`);
+    } catch (err: any) {
+      console.error(err);
+      setUploadError(err.message || 'Gagal memproses file Excel/CSV. Pastikan format kolom sesuai template.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleCommitUploadToSupabase = async () => {
+    if (!pendingFile || !onBulkImportLeads) return;
+    setIsUploading(true);
+    setUploadError(null);
+    setUploadSuccess(null);
+    try {
+      const { file, parsed } = pendingFile;
       const res = await onBulkImportLeads(parsed, file.name);
       
-      const successMsg = `Berhasil mengunggah file '${file.name}'!\n` +
+      const successMsg = `🎉 DATA SUDAH TERUPLOAD KE DATABASE SUPABASE!\n` +
+        `Dokumen '${file.name}' berhasil diunggah secara realtime.\n` +
         `- ${res.added} data baru berhasil didaftarkan.\n` +
         `- ${res.updated} data lama berhasil ditimpa (Smart Upsert).`;
         
       setUploadSuccess(successMsg);
       setLastBatchId(res.batchId);
-      onShowToast(`🎉 Berhasil memproses berkas upload: ${file.name}`);
+      setPendingFile(null); // clear staging on success
+      onShowToast(`🚀 Data berhasil terunggah ke database Supabase!`);
     } catch (err: any) {
       console.error(err);
-      setUploadError(err.message || 'Gagal memproses file Excel/CSV. Pastikan format kolom sesuai template.');
+      setUploadError(err.message || 'Gagal mengunggah data ke database Supabase.');
     } finally {
       setIsUploading(false);
     }
@@ -259,6 +290,25 @@ export const AdminView: React.FC<AdminViewProps> = ({
       }
     } catch (err: any) {
       onShowToast(`❌ Gagal membatalkan unggahan terakhir: ${err.message || err}`);
+    }
+  };
+
+  const handleExecuteDateDelete = async () => {
+    if (!onDeleteLeadsByDateRange) return;
+    if (!deleteStartDate || !deleteEndDate) {
+      onShowToast('⚠️ Masukkan rentang tanggal awal dan akhir terlebih dahulu!');
+      return;
+    }
+    try {
+      setDateDeleteResult(null);
+      const res = await onDeleteLeadsByDateRange(deleteStartDate, deleteEndDate);
+      if (res.success) {
+        setDateDeleteResult(`🗑️ Sukses menghapus ${res.deletedCount} data leads pada rentang tanggal ${deleteStartDate} s/d ${deleteEndDate} dari Supabase & Lokal.`);
+        onShowToast(`🗑️ Sukses menghapus ${res.deletedCount} data!`);
+        setShowDateDeleteModal(false);
+      }
+    } catch (err: any) {
+      onShowToast(`❌ Gagal menghapus data: ${err.message || err}`);
     }
   };
 
@@ -1045,47 +1095,86 @@ export const AdminView: React.FC<AdminViewProps> = ({
               <p className="leading-relaxed font-medium">
                 Sistem mendeteksi <strong>Nomor WhatsApp</strong> sebagai kunci unik. Jika data dengan nomor yang sama ditemukan, data lama akan ditimpa (overwritten) secara otomatis. Jika tidak ada, data baru akan didaftarkan. Sempurna untuk mengoreksi kesalahan ketik tanpa menduplikasi data!
               </p>
-              <p className="text-[10px] text-blue-700 font-bold">
-                * Catatan: File berkas yang Anda unggah diproses langsung di browser Anda dan TIDAK disimpan di database Supabase Storage.
-              </p>
             </div>
 
-            {/* Drag & Drop Upload Zone */}
-            <div
-              onDragEnter={handleDrag}
-              onDragOver={handleDrag}
-              onDragLeave={handleDrag}
-              onDrop={handleDrop}
-              className={`border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer relative ${
-                dragActive
-                  ? 'border-blue-500 bg-blue-50/40'
-                  : 'border-slate-200 hover:border-blue-400 hover:bg-slate-50/50'
-              }`}
-            >
-              <input
-                type="file"
-                id="leads-file-upload"
-                className="hidden"
-                accept=".xlsx,.xls,.csv"
-                onChange={handleFileChange}
-                disabled={isUploading}
-              />
-              <label htmlFor="leads-file-upload" className="cursor-pointer block space-y-2">
-                <div className="flex justify-center">
-                  <div className={`p-3 rounded-full ${isUploading ? 'bg-blue-100' : 'bg-slate-100'}`}>
-                    <Upload className={`w-6 h-6 ${isUploading ? 'text-blue-600 animate-bounce' : 'text-slate-400'}`} />
+            {/* Uploader UI depending on staging file */}
+            {!pendingFile ? (
+              /* Drag & Drop Upload Zone */
+              <div
+                onDragEnter={handleDrag}
+                onDragOver={handleDrag}
+                onDragLeave={handleDrag}
+                onDrop={handleDrop}
+                className={`border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer relative ${
+                  dragActive
+                    ? 'border-blue-500 bg-blue-50/40'
+                    : 'border-slate-200 hover:border-blue-400 hover:bg-slate-50/50'
+                }`}
+              >
+                <input
+                  type="file"
+                  id="leads-file-upload"
+                  className="hidden"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleFileChange}
+                  disabled={isUploading}
+                />
+                <label htmlFor="leads-file-upload" className="cursor-pointer block space-y-2">
+                  <div className="flex justify-center">
+                    <div className={`p-3 rounded-full ${isUploading ? 'bg-blue-100' : 'bg-slate-100'}`}>
+                      <Upload className={`w-6 h-6 ${isUploading ? 'text-blue-600 animate-bounce' : 'text-slate-400'}`} />
+                    </div>
                   </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-700">
+                      {isUploading ? 'Sedang memproses dokumen...' : 'Tarik & lepas file di sini, atau klik untuk memilih file'}
+                    </p>
+                    <p className="text-[10px] text-slate-400 font-semibold mt-1">
+                      Mendukung format file: Excel (.xlsx, .xls) atau teks (.csv)
+                    </p>
+                  </div>
+                </label>
+              </div>
+            ) : (
+              /* Staging Preview & Commit Button */
+              <div className="p-4 bg-blue-50/30 border border-blue-200 rounded-xl space-y-4 animate-scaleIn">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <span className="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 text-[9px] font-extrabold uppercase rounded">
+                      Berkas Terbaca &amp; Siap Upload
+                    </span>
+                    <h4 className="text-xs font-bold text-slate-800 break-all">
+                      {pendingFile.file.name}
+                    </h4>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Total terdeteksi: <strong className="text-blue-700 font-bold">{pendingFile.rowsCount} baris data leads</strong>.
+                    </p>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setPendingFile(null)}
+                    className="px-2.5 py-1 text-slate-400 hover:text-red-500 hover:bg-red-50 text-[10px] font-bold rounded-md border border-slate-200 hover:border-red-200 transition-all cursor-pointer shrink-0"
+                  >
+                    Batal / Ganti Berkas
+                  </button>
                 </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-700">
-                    {isUploading ? 'Sedang memproses dokumen...' : 'Tarik & lepas file di sini, atau klik untuk memilih file'}
-                  </p>
-                  <p className="text-[10px] text-slate-400 font-semibold mt-1">
-                    Mendukung format file: Excel (.xlsx, .xls) atau teks (.csv)
-                  </p>
+
+                <div className="p-3 bg-white border border-blue-100 rounded-lg text-xs text-slate-600 leading-relaxed font-medium">
+                  💡 Klik tombol di bawah ini untuk menyimpan dan menyinkronkan seluruh baris data di atas secara langsung ke cloud database Supabase Anda.
                 </div>
-              </label>
-            </div>
+
+                <button
+                  type="button"
+                  onClick={handleCommitUploadToSupabase}
+                  disabled={isUploading}
+                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-blue-300 text-white font-bold text-xs rounded-lg shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Database className={`w-4 h-4 text-white ${isUploading ? 'animate-spin' : ''}`} />
+                  <span>{isUploading ? 'Menyimpan ke Supabase...' : 'Simpan & Upload ke Database Supabase'}</span>
+                </button>
+              </div>
+            )}
 
             {/* Upload Feedback / Alerts */}
             {uploadError && (
@@ -1099,11 +1188,11 @@ export const AdminView: React.FC<AdminViewProps> = ({
             )}
 
             {uploadSuccess && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-xs text-green-800 flex items-start gap-2 animate-fadeIn">
-                <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-xs text-green-800 flex items-start gap-2.5 animate-fadeIn">
+                <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
                 <div className="whitespace-pre-line font-medium leading-relaxed">
-                  <p className="font-bold text-green-950">Impor Berhasil!</p>
-                  {uploadSuccess}
+                  <p className="font-bold text-green-950 text-xs">NOTICE: DATA BERHASIL TERUPLOAD!</p>
+                  <div className="text-[11px] text-green-800 mt-1">{uploadSuccess}</div>
                 </div>
               </div>
             )}
@@ -1134,6 +1223,80 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* DYNAMIC DATE FILTER BULK DELETION CARD (WAKTU MUNDUR CLEANER) */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
+              <div className="p-2 bg-red-50 text-red-600 rounded-lg">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">
+                  Hapus Data Supabase dengan Filter Tanggal (Waktu Mundur)
+                </h3>
+                <p className="text-[11px] text-slate-400 font-medium">
+                  Gunakan untuk membersihkan data lama secara massal tanpa merusak data terbaru
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-950 font-medium leading-relaxed">
+              ⚠️ <strong>Notice Keamanan Data:</strong> Karena dokumen yang diunggah menggunakan pola tanggal mundur, Anda dapat menghapus data lama pada rentang tanggal tertentu di sini. <strong>Data yang baru (di luar rentang tanggal terpilih) tidak akan ikut terhapus.</strong>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Tanggal Mulai (Start Date)
+                </label>
+                <input
+                  type="date"
+                  value={deleteStartDate}
+                  onChange={(e) => {
+                    setDeleteStartDate(e.target.value);
+                    setDateDeleteResult(null);
+                  }}
+                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-medium focus:ring-1 focus:ring-red-500 focus:outline-none bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Tanggal Selesai (End Date)
+                </label>
+                <input
+                  type="date"
+                  value={deleteEndDate}
+                  onChange={(e) => {
+                    setDeleteEndDate(e.target.value);
+                    setDateDeleteResult(null);
+                  }}
+                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-medium focus:ring-1 focus:ring-red-500 focus:outline-none bg-white"
+                />
+              </div>
+            </div>
+
+            {dateDeleteResult && (
+              <div className="p-3 bg-slate-100 border border-slate-200 rounded-lg text-xs text-slate-700 font-medium animate-fadeIn">
+                {dateDeleteResult}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                if (!deleteStartDate || !deleteEndDate) {
+                  onShowToast('⚠️ Masukkan rentang tanggal awal dan akhir terlebih dahulu!');
+                  return;
+                }
+                setShowDateDeleteModal(true);
+              }}
+              className="w-full py-2 bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-700 border border-red-200 hover:border-red-300 font-bold text-xs rounded-lg shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-red-600" />
+              <span>Hapus Data Pada Rentang Tanggal Ini</span>
+            </button>
           </div>
 
         </div>
@@ -2456,6 +2619,69 @@ $$ LANGUAGE sql SECURITY DEFINER;`;
               >
                 <Trash2 className="w-3.5 h-3.5 text-white" />
                 <span>Ya, Hapus Data Impor Terakhir</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: KONFIRMASI HAPUS DATA FILTER TANGGAL */}
+      {showDateDeleteModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-xl shadow-2xl border border-red-200 max-w-md w-full overflow-hidden animate-scaleIn">
+            <div className="p-4 bg-red-50 border-b border-red-100 flex items-center gap-3">
+              <div className="p-2 bg-red-100 text-red-700 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-red-700" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-red-950 uppercase tracking-tight">
+                  Konfirmasi Hapus Data Berdasarkan Tanggal
+                </h3>
+                <p className="text-[10px] text-red-600 font-semibold mt-0.5">
+                  Tindakan ini akan menghapus data di Supabase &amp; Local Storage secara permanen!
+                </p>
+              </div>
+            </div>
+
+            <div className="p-5 text-xs text-slate-700 leading-relaxed space-y-3">
+              <p className="font-semibold text-slate-800">
+                Apakah Anda yakin ingin menghapus semua data leads yang masuk dalam rentang tanggal berikut?
+              </p>
+              
+              <div className="p-3 bg-red-50/50 border border-red-200 rounded-lg text-red-900 space-y-2 font-medium">
+                <div className="grid grid-cols-2 gap-2 text-center text-xs">
+                  <div className="bg-white p-2 rounded border border-red-100">
+                    <span className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">Tanggal Mulai:</span>
+                    <strong className="text-red-700 font-mono">{deleteStartDate || '-'}</strong>
+                  </div>
+                  <div className="bg-white p-2 rounded border border-red-100">
+                    <span className="block text-[9px] uppercase tracking-wider text-slate-400 font-bold">Tanggal Selesai:</span>
+                    <strong className="text-red-700 font-mono">{deleteEndDate || '-'}</strong>
+                  </div>
+                </div>
+                
+                <p className="text-[11px] leading-relaxed text-red-800 font-semibold mt-2">
+                  ⚠️ Data yang baru (di luar rentang ini) TIDAK akan ikut terhapus. Fitur ini sangat aman digunakan untuk membersihkan data lama secara berkala.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowDateDeleteModal(false)}
+                className="px-4 py-2 bg-white hover:bg-slate-100 active:bg-slate-200 border border-slate-300 text-slate-700 hover:text-slate-900 font-bold text-xs rounded-lg transition-all cursor-pointer"
+              >
+                Batal
+              </button>
+              
+              <button
+                type="button"
+                onClick={handleExecuteDateDelete}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold text-xs rounded-lg shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-white" />
+                <span>Ya, Hapus Data Rentang Tanggal Ini</span>
               </button>
             </div>
           </div>

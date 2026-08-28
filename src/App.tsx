@@ -17,6 +17,7 @@ import {
   dbBulkUpsertLeads,
   dbDeleteUploadBatch,
   dbDeleteLead,
+  dbDeleteLeadsByDateRange,
   dbGetKPITargets,
   dbUpsertKPITarget,
   dbGetProducts,
@@ -1168,6 +1169,39 @@ export default function App() {
     };
   };
 
+  const handleDeleteLeadsByDateRange = async (startDate: string, endDate: string): Promise<{ success: boolean; deletedCount: number; message: string }> => {
+    // 1. Client-side filter
+    const remainingLeads = leads.filter(l => {
+      const date = l.tanggalMasuk; // YYYY-MM-DD
+      return !(date >= startDate && date <= endDate);
+    });
+    
+    const deletedCount = leads.length - remainingLeads.length;
+    
+    // Update local state
+    setLeads(remainingLeads);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(remainingLeads));
+    
+    // 2. Supabase deletion if connected
+    if (supabaseConfig.enabled) {
+      try {
+        const deletedInDb = await dbDeleteLeadsByDateRange(startDate, endDate);
+        console.log(`Deleted ${deletedInDb} records in Supabase.`);
+      } catch (err: any) {
+        console.error('Error deleting date range in Supabase:', err);
+      }
+    }
+    
+    // Sync Google Sheets
+    autoSyncPush(remainingLeads);
+    
+    return {
+      success: true,
+      deletedCount,
+      message: `Berhasil menghapus ${deletedCount} data leads antara tanggal ${startDate} s/d ${endDate}.`
+    };
+  };
+
   // Reset or Clear Data
   const handleResetData = () => {
     setLeads([]);
@@ -1390,6 +1424,7 @@ export default function App() {
             onSyncAllMetaChats={handleSyncAllMetaChats}
             onBulkImportLeads={handleBulkUpsertLeads}
             onDeleteLastImportBatch={handleDeleteLastImportBatch}
+            onDeleteLeadsByDateRange={handleDeleteLeadsByDateRange}
           />
         )}
       </main>

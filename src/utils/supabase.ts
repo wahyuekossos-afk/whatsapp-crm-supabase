@@ -371,6 +371,35 @@ export async function dbDeleteLead(id: string): Promise<void> {
   }
 }
 
+export async function dbDeleteLeadsByDateRange(startDate: string, endDate: string): Promise<number> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return 0;
+  try {
+    // 1. Get matching leads IDs
+    const { data, error: errGet } = await supabase
+      .from('leads')
+      .select('id')
+      .gte('tanggal_masuk', startDate)
+      .lte('tanggal_masuk', endDate);
+    if (errGet) throw errGet;
+    if (!data || data.length === 0) return 0;
+
+    const ids = data.map(d => d.id);
+
+    // 2. Delete them
+    const { error: errDel } = await supabase
+      .from('leads')
+      .delete()
+      .in('id', ids);
+    if (errDel) throw errDel;
+
+    return ids.length;
+  } catch (e) {
+    console.error('Error deleting leads by date range from Supabase:', e);
+    throw e;
+  }
+}
+
 // --- KPI TARGETS ---
 export async function dbGetKPITargets(): Promise<KPITargetsMap> {
   const supabase = getSupabaseClient();
