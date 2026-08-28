@@ -283,8 +283,7 @@ export async function dbUpsertLead(lead: Lead): Promise<void> {
         total_invoice: lead.totalInvoice,
         updated_at: new Date().toISOString(),
         history: lead.history,
-        riwayat_repeat_order: lead.riwayatRepeatOrder || null,
-        upload_batch: lead.uploadBatch || null
+        riwayat_repeat_order: lead.riwayatRepeatOrder || null
       });
     if (error) throw error;
   } catch (e) {
@@ -317,8 +316,7 @@ export async function dbBulkUpsertLeads(leads: Lead[]): Promise<void> {
       total_invoice: l.totalInvoice,
       updated_at: new Date().toISOString(),
       history: l.history,
-      riwayat_repeat_order: l.riwayatRepeatOrder || null,
-      upload_batch: l.uploadBatch || null,
+      riwayat_repeat_order: l.riwayatRepeatOrder || null
     }));
     const { error } = await supabase
       .from('leads')
