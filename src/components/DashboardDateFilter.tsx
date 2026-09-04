@@ -26,12 +26,17 @@ export const DashboardDateFilter: React.FC<DashboardDateFilterProps> = ({
   
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
+  const yesterday = new Date();
+  yesterday.setDate(now.getDate() - 1);
+  const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
   const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const lastYearMonth = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
 
   // Check active preset
   const isAllTime = !filters.selectedMonth && !filters.dateStart && !filters.dateEnd;
   const isToday = !filters.selectedMonth && filters.dateStart === todayStr && filters.dateEnd === todayStr;
+  const isYesterday = !filters.selectedMonth && filters.dateStart === yesterdayStr && filters.dateEnd === yesterdayStr;
   const isThisMonth = filters.selectedMonth === currentYearMonth && !filters.dateStart && !filters.dateEnd;
   const isLastMonth = filters.selectedMonth === lastYearMonth && !filters.dateStart && !filters.dateEnd;
 
@@ -51,6 +56,15 @@ export const DashboardDateFilter: React.FC<DashboardDateFilterProps> = ({
       selectedMonth: '',
       dateStart: todayStr,
       dateEnd: todayStr,
+    }));
+  };
+
+  const handlePresetYesterday = () => {
+    setFilters((prev) => ({
+      ...prev,
+      selectedMonth: '',
+      dateStart: yesterdayStr,
+      dateEnd: yesterdayStr,
     }));
   };
 
@@ -112,6 +126,7 @@ export const DashboardDateFilter: React.FC<DashboardDateFilterProps> = ({
   // Get readable active period label
   const getPeriodText = () => {
     if (isToday) return `Hari Ini (${todayStr})`;
+    if (isYesterday) return `Kemarin (${yesterdayStr})`;
     if (filters.selectedMonth) {
       const [year, month] = filters.selectedMonth.split('-');
       const monthIdx = parseInt(month, 10) - 1;
@@ -120,6 +135,7 @@ export const DashboardDateFilter: React.FC<DashboardDateFilterProps> = ({
     }
     if (filters.dateStart || filters.dateEnd) {
       if (filters.dateStart && filters.dateEnd) {
+        if (filters.dateStart === filters.dateEnd) return filters.dateStart;
         return `${filters.dateStart} s/d ${filters.dateEnd}`;
       }
       if (filters.dateStart) return `Mulai ${filters.dateStart}`;
@@ -177,6 +193,17 @@ export const DashboardDateFilter: React.FC<DashboardDateFilterProps> = ({
               }`}
             >
               Hari Ini
+            </button>
+            <button
+              type="button"
+              onClick={handlePresetYesterday}
+              className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                isYesterday
+                  ? 'bg-white text-emerald-700 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Kemarin
             </button>
             <button
               type="button"
