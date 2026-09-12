@@ -269,7 +269,10 @@ export async function dbGetLeads(): Promise<Lead[]> {
       history: Array.isArray(l.history) ? l.history : [],
       riwayatRepeatOrder: l.riwayat_repeat_order || undefined,
       uploadBatch: l.upload_batch || undefined,
-      isNewUpload: false
+      isNewUpload: false,
+      designerName: l.designer_name || undefined,
+      designDeadlineDays: l.design_deadline_days ? Number(l.design_deadline_days) : undefined,
+      designStartedAt: l.design_started_at || undefined
     }));
   } catch (e) {
     console.error('Error fetching Leads from Supabase:', e);
@@ -302,7 +305,10 @@ export async function dbUpsertLead(lead: Lead): Promise<void> {
         total_invoice: lead.totalInvoice,
         updated_at: new Date().toISOString(),
         history: lead.history,
-        riwayat_repeat_order: lead.riwayatRepeatOrder || null
+        riwayat_repeat_order: lead.riwayatRepeatOrder || null,
+        designer_name: lead.designerName || null,
+        design_deadline_days: lead.designDeadlineDays || null,
+        design_started_at: lead.designStartedAt || null
       });
     if (error) throw error;
   } catch (e) {
@@ -335,7 +341,10 @@ export async function dbBulkUpsertLeads(leads: Lead[]): Promise<void> {
       total_invoice: l.totalInvoice,
       updated_at: new Date().toISOString(),
       history: l.history,
-      riwayat_repeat_order: l.riwayatRepeatOrder || null
+      riwayat_repeat_order: l.riwayatRepeatOrder || null,
+      designer_name: l.designerName || null,
+      design_deadline_days: l.designDeadlineDays || null,
+      design_started_at: l.designStartedAt || null
     }));
     const { error } = await supabase
       .from('leads')
@@ -517,6 +526,74 @@ export async function dbDeleteProduct(clientName: string, productName: string): 
   }
 }
 
+// --- DESIGNERS ---
+export async function dbGetDesigners(): Promise<string[]> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('designers')
+      .select('name');
+
+    if (error) {
+      if (error.code === 'PGRST116' || error.message?.includes('relation "designers" does not exist')) {
+        console.warn('Tabel "designers" belum terbuat di Supabase, mengembalikan array kosong.');
+        return [];
+      }
+      throw error;
+    }
+    return (data || []).map(d => d.name);
+  } catch (e) {
+    console.error('Error fetching Designers from Supabase:', e);
+    return [];
+  }
+}
+
+export async function dbAddDesigner(name: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+  try {
+    const { error } = await supabase
+      .from('designers')
+      .upsert({ name }, { onConflict: 'name' });
+    if (error) throw error;
+  } catch (e) {
+    console.error('Error adding designer to Supabase:', e);
+    throw e;
+  }
+}
+
+export async function dbDeleteDesigner(name: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+  try {
+    const { error } = await supabase
+      .from('designers')
+      .delete()
+      .eq('name', name);
+    if (error) throw error;
+  } catch (e) {
+    console.error('Error deleting designer from Supabase:', e);
+    throw e;
+  }
+}
+
+export async function dbBulkUpsertDesigners(designers: string[]): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+  if (designers.length === 0) return;
+  try {
+    const payload = designers.map(name => ({ name }));
+    const { error } = await supabase
+      .from('designers')
+      .upsert(payload, { onConflict: 'name' });
+    if (error) throw error;
+  } catch (e) {
+    console.error('Error bulk upserting Designers to Supabase:', e);
+    throw e;
+  }
+}
+
 // --- META CHATS ---
 export async function dbGetMetaChats(): Promise<MetaChat[]> {
   const supabase = getSupabaseClient();
@@ -660,6 +737,7 @@ export async function dbBulkSeed(data: {
   productsMap: ProductsMap;
   spreadsheetConfig: SpreadsheetConfig;
   metaChats?: MetaChat[];
+  designers?: string[];
 }): Promise<{ success: boolean; message: string }> {
   const supabase = getSupabaseClient();
   if (!supabase) return { success: false, message: 'Supabase belum dikoneksikan.' };
@@ -769,7 +847,10 @@ export async function dbBulkSeed(data: {
             total_invoice: lead.totalInvoice,
             updated_at: lead.updatedAt || new Date().toISOString(),
             history: lead.history,
-            riwayat_repeat_order: lead.riwayatRepeatOrder || null
+            riwayat_repeat_order: lead.riwayatRepeatOrder || null,
+            designer_name: lead.designerName || null,
+            design_deadline_days: lead.designDeadlineDays || null,
+            design_started_at: lead.designStartedAt || null
           };
         }
       });
@@ -809,6 +890,13 @@ export async function dbBulkSeed(data: {
       last_synced_at: data.spreadsheetConfig.lastSyncedAt
     });
     if (error) throw new Error(`Spreadsheet Config seed failed: ${error.message}`);
+
+    // 6.5. Seed Designers
+    if (data.designers && data.designers.length > 0) {
+      const payload = data.designers.map(name => ({ name }));
+      const { error: errDes } = await supabase.from('designers').upsert(payload, { onConflict: 'name' });
+      if (errDes) throw new Error(`Designers seed failed: ${errDes.message}`);
+    }
 
     return { success: true, message: 'Semua data CRM berhasil dimigrasikan ke Supabase!' };
   } catch (e: any) {
@@ -859,7 +947,10 @@ CREATE TABLE IF NOT EXISTS leads (
     history JSONB DEFAULT '[]'::jsonb,
     riwayat_repeat_order TEXT,
     upload_batch TEXT,
-    is_new_upload BOOLEAN DEFAULT false
+    is_new_upload BOOLEAN DEFAULT false,
+    designer_name TEXT,
+    design_deadline_days INTEGER,
+    design_started_at TEXT
 );
 
 -- 4. Tabel KPI Targets
@@ -898,6 +989,11 @@ CREATE TABLE IF NOT EXISTS meta_chats (
     UNIQUE(tanggal, nama_cs)
 );
 
+-- 8. Tabel Designers
+CREATE TABLE IF NOT EXISTS designers (
+    name TEXT PRIMARY KEY
+);
+
 -- AKTIFKAN BARIS INI JIKA ANDA INGIN MENGAKTIFKAN KEAMANAN RLS (Optional)
 -- Secara bawaan, Anda bisa membiarkan RLS nonaktif atau buat kebijakan bypass anon jika ingin mudah.
 ALTER TABLE dashboards DISABLE ROW LEVEL SECURITY;
@@ -907,6 +1003,7 @@ ALTER TABLE kpi_targets DISABLE ROW LEVEL SECURITY;
 ALTER TABLE products DISABLE ROW LEVEL SECURITY;
 ALTER TABLE spreadsheet_config DISABLE ROW LEVEL SECURITY;
 ALTER TABLE meta_chats DISABLE ROW LEVEL SECURITY;
+ALTER TABLE designers DISABLE ROW LEVEL SECURITY;
 `;
 
 // Clear all tables in connected Supabase
@@ -958,6 +1055,10 @@ export async function dbClearAllSupabaseData(): Promise<{ success: boolean; mess
     // 7. Delete meta_chats
     const { error: errMeta } = await supabase.from('meta_chats').delete().neq('tanggal', '_dummy_key_');
     if (errMeta) throw new Error(`Meta Chats: ${errMeta.message}`);
+
+    // 8. Delete designers
+    const { error: errDesigners } = await supabase.from('designers').delete().neq('name', '_dummy_key_');
+    if (errDesigners) throw new Error(`Designers: ${errDesigners.message}`);
 
     return { success: true, message: 'Seluruh database di Supabase berhasil dikosongkan!' };
   } catch (err: any) {

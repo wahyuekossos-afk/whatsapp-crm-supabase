@@ -31,7 +31,11 @@ import {
   dbGetMetaChats,
   dbUpsertMetaChat,
   dbBulkUpsertMetaChats,
-  dbDeleteMetaChat
+  dbDeleteMetaChat,
+  dbGetDesigners,
+  dbAddDesigner,
+  dbDeleteDesigner,
+  dbBulkUpsertDesigners
 } from './utils/supabase';
 import { Navbar } from './components/Navbar';
 import { DashboardKPI } from './components/DashboardKPI';
@@ -115,14 +119,15 @@ export default function App() {
         const client = getSupabaseClient();
         if (!client) return;
 
-        const [dbLeads, dbCS, dbDashes, dbKPI, dbProds, dbSsheet, dbMetaChats] = await Promise.all([
+        const [dbLeads, dbCS, dbDashes, dbKPI, dbProds, dbSsheet, dbMetaChats, dbDesigners] = await Promise.all([
           dbGetLeads().catch(() => null),
           dbGetCSUsers().catch(() => null),
           dbGetDashboards().catch(() => null),
           dbGetKPITargets().catch(() => null),
           dbGetProducts().catch(() => null),
           dbGetSpreadsheetConfig().catch(() => null),
-          dbGetMetaChats().catch(() => null)
+          dbGetMetaChats().catch(() => null),
+          dbGetDesigners().catch(() => null)
         ]);
 
         if (dbLeads) {
@@ -162,6 +167,10 @@ export default function App() {
           setMetaChats(dbMetaChats);
           localStorage.setItem('crm_wa_meta_chats_v1', JSON.stringify(dbMetaChats));
         }
+        if (dbDesigners && dbDesigners.length > 0) {
+          setDesigners(dbDesigners);
+          localStorage.setItem('crm_wa_designers_v1', JSON.stringify(dbDesigners));
+        }
 
         showToast('⚡ Data CRM berhasil dimuat dari Supabase Cloud Database!');
       } catch (err) {
@@ -189,7 +198,8 @@ export default function App() {
       kpiTargetsMap,
       productsMap,
       spreadsheetConfig,
-      metaChats
+      metaChats,
+      designers
     });
     return res;
   };
@@ -346,6 +356,27 @@ export default function App() {
     }
   }, [metaChats]);
 
+  // Designers state
+  const [designers, setDesigners] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('crm_wa_designers_v1');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('Failed to load designers from storage:', e);
+    }
+    return ['Ahmad Designer', 'Budi Designer', 'Candra Designer'];
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('crm_wa_designers_v1', JSON.stringify(designers));
+    } catch (e) {
+      console.error('Failed to save designers:', e);
+    }
+  }, [designers]);
+
   // Handler to add or update a MetaChat target entry
   const handleUpsertMetaChat = async (chat: MetaChat): Promise<boolean> => {
     const existingIdx = metaChats.findIndex(
@@ -474,6 +505,29 @@ export default function App() {
       } catch (e) {
         console.error('Failed to push products to Google Sheets:', e);
       }
+    }
+  };
+
+  const handleAddDesigner = async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setDesigners((prev) => {
+      if (prev.includes(trimmed)) return prev;
+      return [...prev, trimmed];
+    });
+    showToast(`✅ Designer '${trimmed}' berhasil ditambahkan!`);
+
+    if (supabaseConfig.enabled) {
+      await dbAddDesigner(trimmed).catch(err => console.error(err));
+    }
+  };
+
+  const handleDeleteDesigner = async (name: string) => {
+    setDesigners((prev) => prev.filter((d) => d !== name));
+    showToast(`🗑️ Designer '${name}' berhasil dihapus.`);
+
+    if (supabaseConfig.enabled) {
+      await dbDeleteDesigner(name).catch(err => console.error(err));
     }
   };
 
@@ -1432,6 +1486,9 @@ export default function App() {
             onUploadBatchToSupabase={handleUploadBatchToSupabase}
             onDeleteLastImportBatch={handleDeleteLastImportBatch}
             onDeleteLeadsByDateRange={handleDeleteLeadsByDateRange}
+            designers={designers}
+            onAddDesigner={handleAddDesigner}
+            onDeleteDesigner={handleDeleteDesigner}
           />
         )}
       </main>
@@ -1466,6 +1523,7 @@ export default function App() {
         activeDashboardName={activeDashboardName}
         existingCities={existingCities}
         productsMap={productsMap}
+        designers={designers}
       />
 
       <UpdateLeadModal
@@ -1479,6 +1537,7 @@ export default function App() {
         currentCS={currentCS}
         existingCities={existingCities}
         productsMap={productsMap}
+        designers={designers}
       />
 
       <HistoryModal

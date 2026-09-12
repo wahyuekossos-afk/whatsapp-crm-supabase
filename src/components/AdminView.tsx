@@ -26,7 +26,8 @@ import {
   Target,
   Package,
   Plus,
-  HardDrive
+  HardDrive,
+  Palette
 } from 'lucide-react';
 
 interface AdminViewProps {
@@ -64,6 +65,9 @@ interface AdminViewProps {
   onUploadBatchToSupabase?: (batchId: string) => Promise<{ success: boolean; uploadedCount: number; message: string }>;
   onDeleteLastImportBatch?: () => Promise<{ success: boolean; deletedCount: number; clearedCount: number; message: string }>;
   onDeleteLeadsByDateRange?: (startDate: string, endDate: string) => Promise<{ success: boolean; deletedCount: number; message: string }>;
+  designers?: string[];
+  onAddDesigner?: (name: string) => void;
+  onDeleteDesigner?: (name: string) => void;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({
@@ -101,6 +105,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
   onUploadBatchToSupabase,
   onDeleteLastImportBatch,
   onDeleteLeadsByDateRange,
+  designers = [],
+  onAddDesigner,
+  onDeleteDesigner,
 }) => {
   // All client names list
   const allClientNames = useMemo(() => {
@@ -115,6 +122,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   // Selected Product Database Dashboard Client
   const [selectedProdDashboard, setSelectedProdDashboard] = useState<string>(activeDashboardName || 'Wibu Sales (Utama)');
   const [newProductName, setNewProductName] = useState<string>('');
+  const [newDesignerName, setNewDesignerName] = useState<string>('');
 
   // Upload States
   const [isUploading, setIsUploading] = useState(false);
@@ -381,6 +389,22 @@ export const AdminView: React.FC<AdminViewProps> = ({
       onAddProduct(selectedProdDashboard, newProductName.trim());
     }
     setNewProductName('');
+  };
+
+  const handleAddDesignerSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDesignerName.trim()) {
+      onShowToast('⚠️ Masukkan nama designer terlebih dahulu.');
+      return;
+    }
+    if (designers.includes(newDesignerName.trim())) {
+      onShowToast('⚠️ Nama designer sudah terdaftar.');
+      return;
+    }
+    if (onAddDesigner) {
+      onAddDesigner(newDesignerName.trim());
+    }
+    setNewDesignerName('');
   };
 
   // Selected KPI Targets
@@ -1304,6 +1328,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
               </div>
             </div>
           </div>
+
+
 
           {/* INPUT DATA META CHATS */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-4">

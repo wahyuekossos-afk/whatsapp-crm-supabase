@@ -271,7 +271,14 @@ export const FLOW_CATEGORIES = [
   'Qualified',
   'Quotation',
   'Follow Up',
+  'Req Sample',
+  'Req Desaign',
+  'Finish Req Design',
   'First Order',
+  'Progres Desaign',
+  'Finish Desaign',
+  'Produksi',
+  'Kirim',
   'Repeat Order',
   'Lost'
 ] as const;

@@ -23,9 +23,9 @@ export const DashboardKPI: React.FC<DashboardKPIProps> = ({ leads, kpiTargets })
 
   const totalLeads = leads.length;
 
-  // Closed Won = First Order + Repeat Order
+  // Closed Won = First Order + Repeat Order + Progres Desaign + Finish Desaign + Produksi + Kirim
   const closedLeads = leads.filter(
-    (l) => l.kategoriFlow === 'First Order' || l.kategoriFlow === 'Repeat Order'
+    (l) => ['First Order', 'Repeat Order', 'Progres Desaign', 'Finish Desaign', 'Produksi', 'Kirim'].includes(l.kategoriFlow)
   );
   const closedCount = closedLeads.length;
 

@@ -14,6 +14,7 @@ interface NewLeadModalProps {
   activeDashboardName?: string;
   existingCities?: string[];
   productsMap?: ProductsMap;
+  designers?: string[];
 }
 
 export const NewLeadModal: React.FC<NewLeadModalProps> = ({
@@ -25,6 +26,7 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
   activeDashboardName = 'Wibu Sales (Utama)',
   existingCities,
   productsMap,
+  designers = [],
 }) => {
   if (!isOpen) return null;
 
@@ -58,6 +60,10 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
   const [quantityOrder, setQuantityOrder] = useState<number>(0);
   const [totalInvoice, setTotalInvoice] = useState<number>(0);
 
+  // Progres Desaign specific states
+  const [designerName, setDesignerName] = useState('');
+  const [designDeadlineDays, setDesignDeadlineDays] = useState<number>(3);
+
   const [errorMsg, setErrorMsg] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -75,9 +81,18 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
       return setErrorMsg('5. Alasan Lost WAJIB diisi jika kategori Flow adalah "Lost"!');
     }
 
-    // Special First Order quantity validation
-    if (kategoriFlow === 'First Order' && (isNaN(Number(quantityOrder)) || Number(quantityOrder) <= 0)) {
-      return setErrorMsg('12. Quantity Order (pcs) WAJIB diisi lebih dari 0 jika kategori Flow adalah "First Order"!');
+    // Special First Order validation rules for Quantity
+    if (kategoriFlow === 'First Order') {
+      if (isNaN(Number(quantityOrder)) || Number(quantityOrder) <= 0) {
+        return setErrorMsg('12. Quantity Order (pcs) WAJIB diisi lebih dari 0 jika kategori Flow adalah "First Order"!');
+      }
+    }
+
+    // Special Progres Desaign validation rules for Design (Mandatory)
+    if (kategoriFlow === 'Progres Desaign') {
+      if (!designDeadlineDays || isNaN(Number(designDeadlineDays)) || Number(designDeadlineDays) <= 0) {
+        return setErrorMsg('🎯 Dead Line (Hari) wajib diisi dengan angka lebih besar dari 0!');
+      }
     }
 
     if (!tanggalMasuk) return setErrorMsg('6. Tanggal Leads Masuk wajib diisi.');
@@ -103,6 +118,9 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
       quantityOrder: isNaN(Number(quantityOrder)) ? 0 : Number(quantityOrder),
       totalInvoice: isNaN(Number(totalInvoice)) ? 0 : Number(totalInvoice),
       updatedAt: new Date().toISOString(),
+      designerName: undefined,
+      designDeadlineDays: kategoriFlow === 'Progres Desaign' ? Number(designDeadlineDays) : undefined,
+      designStartedAt: kategoriFlow === 'Progres Desaign' ? new Date().toISOString() : undefined,
       history: [
         {
           id: `h-${Date.now()}`,
@@ -110,8 +128,8 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
           csName: namaCS.trim(),
           toFlow: kategoriFlow,
           note:
-            kategoriFlow === 'First Order'
-              ? `First Order ${isNaN(Number(quantityOrder)) ? 0 : Number(quantityOrder)} pcs, ${formatRupiah(Number(totalInvoice) || 0)}`
+            kategoriFlow === 'Progres Desaign'
+              ? `${kategoriFlow} ${isNaN(Number(quantityOrder)) ? 0 : Number(quantityOrder)} pcs, ${formatRupiah(Number(totalInvoice) || 0)} (Deadline: ${designDeadlineDays} hari)`
               : `Input lead baru via WhatsApp (${noteCustomer})`,
           itemOrder: itemOrder.trim(),
           quantityOrder: isNaN(Number(quantityOrder)) ? 0 : Number(quantityOrder),
@@ -241,11 +259,24 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                   onChange={(e) => setKategoriFlow(e.target.value as FlowCategory)}
                   className="w-full px-3 py-2.5 sm:py-2 text-sm sm:text-xs bg-white border border-slate-300 rounded-lg font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 >
-                  {FLOW_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
+                  {FLOW_CATEGORIES.map((cat) => {
+                    const displayText = cat === 'Progres Desaign'
+                      ? '\u00A0\u00A0\u00A0\u00A0- PROGRES/REVISI DESIGN'
+                      : cat === 'Finish Desaign'
+                      ? '\u00A0\u00A0\u00A0\u00A0- FINISH DESAIN'
+                      : cat === 'Produksi'
+                      ? '\u00A0\u00A0\u00A0\u00A0- PRODUKSI'
+                      : cat === 'Kirim'
+                      ? '\u00A0\u00A0\u00A0\u00A0- KIRIM'
+                      : cat === 'Finish Req Design'
+                      ? '\u00A0\u00A0\u00A0\u00A0- FINISH REQ DESIGN'
+                      : cat.toUpperCase();
+                    return (
+                      <option key={cat} value={cat}>
+                        {displayText}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -272,6 +303,26 @@ export const NewLeadModal: React.FC<NewLeadModalProps> = ({
                 </select>
               </div>
             </div>
+
+            {/* Progres Desaign custom design inputs */}
+            {kategoriFlow === 'Progres Desaign' && (
+              <div className="p-3 border border-indigo-200 rounded-xl animate-in fade-in slide-in-from-top-2 duration-150 bg-indigo-50">
+                <div>
+                  <label className="block font-bold mb-1 text-sm sm:text-xs text-indigo-900">
+                    🎯 Dead Line Desain (Hari) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={designDeadlineDays || ''}
+                    onChange={(e) => setDesignDeadlineDays(e.target.value ? Number(e.target.value) : 0)}
+                    className="w-full px-3 py-2 text-sm sm:text-xs bg-white border border-indigo-300 rounded-lg font-bold text-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Contoh: 3"
+                    required
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Row 4: Dates & Times */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

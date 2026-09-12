@@ -130,6 +130,12 @@ export const LeadTable: React.FC<LeadTableProps> = ({
       return;
     }
 
+    if (newFlow === 'Req Desaign') {
+      // Must open edit modal "Update Lead Existing" for entering design details optionally
+      onOpenEditModal({ ...lead, kategoriFlow: 'Req Desaign' });
+      return;
+    }
+
     const updated: Lead = {
       ...lead,
       kategoriFlow: newFlow,
@@ -180,9 +186,27 @@ export const LeadTable: React.FC<LeadTableProps> = ({
       return false;
     }
 
-    // Filter Kategori Flow
-    if (filters.kategoriFlow && lead.kategoriFlow !== filters.kategoriFlow) {
-      return false;
+    // Filter Kategori Flow (Parent-Child relations for First Order & Req Desaign sub-pipelines)
+    if (filters.kategoriFlow) {
+      if (filters.kategoriFlow === 'First Order') {
+        if (!['First Order', 'Progres Desaign', 'Finish Desaign', 'Produksi', 'Kirim'].includes(lead.kategoriFlow)) {
+          return false;
+        }
+      } else if (filters.kategoriFlow === 'Progres Desaign') {
+        const hasDesignInfo = lead.designDeadlineDays && lead.designDeadlineDays > 0;
+        if (lead.kategoriFlow === 'First Order' && !hasDesignInfo) {
+          return false;
+        }
+        if (lead.kategoriFlow !== 'Progres Desaign' && lead.kategoriFlow !== 'First Order') {
+          return false;
+        }
+      } else if (filters.kategoriFlow === 'Req Desaign') {
+        if (!['Req Desaign', 'Finish Req Design'].includes(lead.kategoriFlow)) {
+          return false;
+        }
+      } else if (lead.kategoriFlow !== filters.kategoriFlow) {
+        return false;
+      }
     }
 
     // Filter Lokasi
@@ -242,6 +266,20 @@ export const LeadTable: React.FC<LeadTableProps> = ({
         return 'bg-blue-100 text-blue-700 border-blue-200 text-[9px] font-bold uppercase';
       case 'Quotation':
         return 'bg-amber-100 text-amber-700 border-amber-200 text-[9px] font-bold uppercase';
+      case 'Req Sample':
+        return 'bg-orange-100 text-orange-700 border-orange-200 text-[9px] font-bold uppercase';
+      case 'Req Desaign':
+        return 'bg-violet-100 text-violet-700 border-violet-200 text-[9px] font-bold uppercase';
+      case 'Finish Req Design':
+        return 'bg-cyan-100 text-cyan-700 border-cyan-200 text-[9px] font-bold uppercase';
+      case 'Progres Desaign':
+        return 'bg-pink-100 text-pink-700 border-pink-200 text-[9px] font-bold uppercase';
+      case 'Finish Desaign':
+        return 'bg-sky-100 text-sky-700 border-sky-200 text-[9px] font-bold uppercase';
+      case 'Produksi':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200 text-[9px] font-bold uppercase';
+      case 'Kirim':
+        return 'bg-indigo-100 text-indigo-700 border-indigo-200 text-[9px] font-bold uppercase';
       case 'Follow Up':
         return 'bg-purple-100 text-purple-700 border-purple-200 text-[9px] font-bold uppercase';
       case 'First Order':
@@ -306,9 +344,24 @@ export const LeadTable: React.FC<LeadTableProps> = ({
             className="text-[11px] px-2.5 py-1 bg-white border border-slate-200 rounded text-slate-700 focus:outline-none focus:ring-1 focus:ring-green-500 cursor-pointer font-medium"
           >
             <option value="">Semua Stage</option>
-            {FLOW_CATEGORIES.map((flow) => (
-              <option key={flow} value={flow}>{flow}</option>
-            ))}
+            {FLOW_CATEGORIES.map((flow) => {
+              const displayText = flow === 'Progres Desaign'
+                ? '\u00A0\u00A0\u00A0\u00A0- PROGRES/REVISI DESIGN'
+                : flow === 'Finish Desaign'
+                ? '\u00A0\u00A0\u00A0\u00A0- FINISH DESAIN'
+                : flow === 'Produksi'
+                ? '\u00A0\u00A0\u00A0\u00A0- PRODUKSI'
+                : flow === 'Kirim'
+                ? '\u00A0\u00A0\u00A0\u00A0- KIRIM'
+                : flow === 'Finish Req Design'
+                ? '\u00A0\u00A0\u00A0\u00A0- FINISH REQ DESIGN'
+                : flow.toUpperCase();
+              return (
+                <option key={flow} value={flow}>
+                  {displayText}
+                </option>
+              );
+            })}
           </select>
 
           {/* City Filter */}
@@ -374,7 +427,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
           <tbody className="text-[11px] divide-y divide-slate-100">
             {sortedLeads.length === 0 ? (
               <tr>
-                <td colSpan={10} className="py-8 text-center text-slate-400">
+                <td colSpan={12} className="py-8 text-center text-slate-400">
                   Tidak ada data sales yang ditemukan.
                 </td>
               </tr>
@@ -419,11 +472,24 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                           lead.kategoriFlow
                         )}`}
                       >
-                        {FLOW_CATEGORIES.map((cat) => (
-                          <option key={cat} value={cat} className="bg-white text-slate-800 font-normal">
-                            {cat}
-                          </option>
-                        ))}
+                        {FLOW_CATEGORIES.map((cat) => {
+                          const displayText = cat === 'Progres Desaign'
+                            ? '\u00A0\u00A0\u00A0\u00A0- PROGRES/REVISI DESIGN'
+                            : cat === 'Finish Desaign'
+                            ? '\u00A0\u00A0\u00A0\u00A0- FINISH DESAIN'
+                            : cat === 'Produksi'
+                            ? '\u00A0\u00A0\u00A0\u00A0- PRODUKSI'
+                            : cat === 'Kirim'
+                            ? '\u00A0\u00A0\u00A0\u00A0- KIRIM'
+                            : cat === 'Finish Req Design'
+                            ? '\u00A0\u00A0\u00A0\u00A0- FINISH REQ DESIGN'
+                            : cat.toUpperCase();
+                          return (
+                            <option key={cat} value={cat} className="bg-white text-slate-800 font-normal">
+                              {displayText}
+                            </option>
+                          );
+                        })}
                       </select>
                     </td>
 

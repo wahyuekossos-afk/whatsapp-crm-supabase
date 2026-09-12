@@ -13,6 +13,7 @@ interface UpdateLeadModalProps {
   currentCS: CSUser;
   existingCities?: string[];
   productsMap?: ProductsMap;
+  designers?: string[];
 }
 
 export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
@@ -23,6 +24,7 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
   currentCS,
   existingCities,
   productsMap,
+  designers = [],
 }) => {
   if (!isOpen || !lead) return null;
 
@@ -43,6 +45,10 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
   const [itemOrder, setItemOrder] = useState(lead.itemOrder || '');
   const [quantityOrder, setQuantityOrder] = useState<number>(lead.quantityOrder !== undefined ? lead.quantityOrder : 0);
   const [totalInvoice, setTotalInvoice] = useState<number>(lead.totalInvoice || 0);
+
+  // Progres Desaign specific states
+  const [designerName, setDesignerName] = useState(lead.designerName || '');
+  const [designDeadlineDays, setDesignDeadlineDays] = useState<number>(lead.designDeadlineDays || 3);
 
   // Multi-item Repeat Order State
   const [repeatItems, setRepeatItems] = useState<RepeatOrderItem[]>([
@@ -70,6 +76,8 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
       setItemOrder(lead.itemOrder || '');
       setQuantityOrder(lead.quantityOrder !== undefined ? lead.quantityOrder : 0);
       setTotalInvoice(lead.totalInvoice || 0);
+      setDesignerName(lead.designerName || '');
+      setDesignDeadlineDays(lead.designDeadlineDays || 3);
       setUpdateLogNote('');
       setErrorMsg('');
 
@@ -178,9 +186,18 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
       return setErrorMsg('VALIDASI KHUSUS: Alasan Lost WAJIB diisi jika kategori = "Lost"!');
     }
 
-    // Special First Order quantity validation
-    if (kategoriFlow === 'First Order' && (isNaN(Number(quantityOrder)) || Number(quantityOrder) <= 0)) {
-      return setErrorMsg('VALIDASI KHUSUS: Quantity Order (pcs) WAJIB diisi lebih dari 0 jika kategori adalah "First Order"!');
+    // Special First Order validation rules for Quantity
+    if (kategoriFlow === 'First Order') {
+      if (isNaN(Number(quantityOrder)) || Number(quantityOrder) <= 0) {
+        return setErrorMsg('VALIDASI KHUSUS: Quantity Order (pcs) WAJIB diisi lebih dari 0 jika kategori adalah "First Order"!');
+      }
+    }
+
+    // Special Progres Desaign validation rules for Design (Mandatory)
+    if (kategoriFlow === 'Progres Desaign') {
+      if (!designDeadlineDays || isNaN(Number(designDeadlineDays)) || Number(designDeadlineDays) <= 0) {
+        return setErrorMsg('VALIDASI KHUSUS: Dead Line (Hari) wajib diisi dengan angka lebih besar dari 0!');
+      }
     }
 
     // Repeat Order Validation: Items cannot be completely empty
@@ -271,6 +288,9 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
       totalInvoice: finalTotalInvoice,
       riwayatRepeatOrder: newRiwayatRepeatStr,
       updatedAt: new Date().toISOString(),
+      designerName: undefined,
+      designDeadlineDays: kategoriFlow === 'Progres Desaign' ? Number(designDeadlineDays) : lead.designDeadlineDays,
+      designStartedAt: kategoriFlow === 'Progres Desaign' ? (lead.designStartedAt ? lead.designStartedAt : new Date().toISOString()) : lead.designStartedAt,
       history: [
         ...lead.history,
         {
@@ -283,8 +303,8 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
             updateLogNote ||
             (kategoriFlow === 'Repeat Order'
               ? `Repeat Order Baru (${calcCurrentRepeatQty} pcs, ${formatRupiah(calcCurrentRepeatInvoice)})`
-              : kategoriFlow === 'First Order'
-              ? `First Order ${finalQuantityOrder} pcs, ${formatRupiah(finalTotalInvoice)}`
+              : kategoriFlow === 'Progres Desaign'
+              ? `${kategoriFlow} ${finalQuantityOrder} pcs, ${formatRupiah(finalTotalInvoice)} (Deadline: ${designDeadlineDays} hari)`
               : `Update status ke ${kategoriFlow}`),
           itemOrder: finalItemOrderStr,
           quantityOrder: finalQuantityOrder,
@@ -409,11 +429,24 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
                       : 'bg-white border-slate-300 text-slate-900 focus:ring-indigo-500'
                   }`}
                 >
-                  {FLOW_CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
+                  {FLOW_CATEGORIES.map((cat) => {
+                    const displayText = cat === 'Progres Desaign'
+                      ? '\u00A0\u00A0\u00A0\u00A0- PROGRES/REVISI DESIGN'
+                      : cat === 'Finish Desaign'
+                      ? '\u00A0\u00A0\u00A0\u00A0- FINISH DESAIN'
+                      : cat === 'Produksi'
+                      ? '\u00A0\u00A0\u00A0\u00A0- PRODUKSI'
+                      : cat === 'Kirim'
+                      ? '\u00A0\u00A0\u00A0\u00A0- KIRIM'
+                      : cat === 'Finish Req Design'
+                      ? '\u00A0\u00A0\u00A0\u00A0- FINISH REQ DESIGN'
+                      : cat.toUpperCase();
+                    return (
+                      <option key={cat} value={cat}>
+                        {displayText}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -441,6 +474,26 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
                 </select>
               </div>
             </div>
+
+            {/* Progres Desaign custom design inputs */}
+            {kategoriFlow === 'Progres Desaign' && (
+              <div className="p-3 border border-indigo-200 rounded-xl animate-in fade-in slide-in-from-top-2 duration-150 bg-indigo-50">
+                <div>
+                  <label className="block font-bold mb-1 text-sm sm:text-xs text-indigo-900">
+                    🎯 Dead Line Desain (Hari) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={designDeadlineDays || ''}
+                    onChange={(e) => setDesignDeadlineDays(e.target.value ? Number(e.target.value) : 0)}
+                    className="w-full px-3 py-2 text-sm sm:text-xs bg-white border border-indigo-300 rounded-lg font-bold text-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Contoh: 3"
+                    required
+                  />
+                </div>
+              </div>
+            )}
 
             {/* Time & Location Update */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">

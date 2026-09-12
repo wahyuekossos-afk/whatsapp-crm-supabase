@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Lead, CSUser, MetaChat } from '../types';
+import { FLOW_CATEGORIES } from '../data/initialData';
 import { formatRupiah, calculateResponseMinutes, formatResponseTime } from '../utils/spreadsheet';
 import { 
   Award, 
@@ -61,7 +62,7 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
       const totalCount = csLeads.length;
 
       const closed = csLeads.filter(
-        (l) => l.kategoriFlow === 'First Order' || l.kategoriFlow === 'Repeat Order'
+        (l) => ['First Order', 'Repeat Order', 'Progres Desaign', 'Finish Desaign', 'Produksi', 'Kirim'].includes(l.kategoriFlow)
       );
       const closedCount = closed.length;
       const revenue = closed.reduce((acc, l) => acc + (l.totalInvoice || 0), 0);
@@ -96,15 +97,7 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
 
   // Chart data for Sales Flow distribution
   const flowCategoryData = useMemo(() => {
-    return [
-      'New Leads',
-      'Qualified',
-      'Quotation',
-      'Follow Up',
-      'First Order',
-      'Repeat Order',
-      'Lost',
-    ].map((cat) => ({
+    return FLOW_CATEGORIES.map((cat) => ({
       name: cat,
       total: leads.filter((l) => l.kategoriFlow === cat).length,
     }));
@@ -125,7 +118,23 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
     }));
   }, [leads]);
 
-  const COLORS = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#06b6d4', '#6366f1', '#ec4899'];
+  const COLORS = [
+    '#3b82f6', // New Leads (Blue)
+    '#a855f7', // Qualified (Purple)
+    '#f59e0b', // Quotation (Amber)
+    '#6366f1', // Follow Up (Indigo)
+    '#f97316', // Req Sample (Orange)
+    '#8b5cf6', // Req Desaign (Violet)
+    '#06b6d4', // Finish Req Design (Cyan)
+    '#ec4899', // Progres Desaign (Pink)
+    '#0284c7', // Finish Desaign (Sky)
+    '#eab308', // Produksi (Yellow)
+    '#4f46e5', // Kirim (Indigo)
+    '#10b981', // First Order (Emerald)
+    '#14b8a6', // Repeat Order (Teal)
+    '#ef4444', // Lost (Rose)
+    '#64748b'  // Fallback (Slate)
+  ];
 
   // --- SUMMARY CHAT PIVOT TABLE LOGIC (SUPABASE LEADS VS META TARGETS) ---
   const allDates = useMemo(() => {

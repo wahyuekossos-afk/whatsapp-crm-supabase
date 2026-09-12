@@ -3,6 +3,13 @@ export type FlowCategory =
   | 'Qualified'
   | 'Quotation'
   | 'Follow Up'
+  | 'Req Sample'
+  | 'Req Desaign'
+  | 'Finish Req Design'
+  | 'Progres Desaign'
+  | 'Finish Desaign'
+  | 'Produksi'
+  | 'Kirim'
   | 'First Order'
   | 'Repeat Order'
   | 'Lost';
@@ -76,6 +83,9 @@ export interface Lead {
   riwayatRepeatOrder?: string; // Serialized JSON string for Column P in Google Sheets
   uploadBatch?: string;        // Track which batch this lead was uploaded from (e.g. "Batch - filename - timestamp")
   isNewUpload?: boolean;       // Flag if this lead was newly created from upload vs updated
+  designerName?: string;
+  designDeadlineDays?: number;
+  designStartedAt?: string;
 }
 
 export interface CSUser {
