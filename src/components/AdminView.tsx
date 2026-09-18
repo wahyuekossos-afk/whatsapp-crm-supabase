@@ -412,6 +412,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
     clientName: selectedKPIClient,
     conversionRate: 15,
     avgResponseMinutes: 5,
+    conversionRateIG: 15,
+    avgResponseMinutesIG: 5,
   };
 
   const [targetCRInput, setTargetCRInput] = useState<string>(
@@ -420,26 +422,40 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [targetRTInput, setTargetRTInput] = useState<string>(
     String(currentKPITargets.avgResponseMinutes)
   );
+  const [targetCRInputIG, setTargetCRInputIG] = useState<string>(
+    String(currentKPITargets.conversionRateIG ?? 15)
+  );
+  const [targetRTInputIG, setTargetRTInputIG] = useState<string>(
+    String(currentKPITargets.avgResponseMinutesIG ?? 5)
+  );
 
   useEffect(() => {
     const t = kpiTargetsMap?.[selectedKPIClient] || {
       clientName: selectedKPIClient,
       conversionRate: 15,
       avgResponseMinutes: 5,
+      conversionRateIG: 15,
+      avgResponseMinutesIG: 5,
     };
     setTargetCRInput(String(t.conversionRate));
     setTargetRTInput(String(t.avgResponseMinutes));
+    setTargetCRInputIG(String(t.conversionRateIG ?? 15));
+    setTargetRTInputIG(String(t.avgResponseMinutesIG ?? 5));
   }, [selectedKPIClient, kpiTargetsMap]);
 
   const handleSaveKPITargets = (e: React.FormEvent) => {
     e.preventDefault();
     const cr = parseFloat(targetCRInput) || 0;
     const rt = parseInt(targetRTInput, 10) || 0;
+    const crIG = parseFloat(targetCRInputIG) || 0;
+    const rtIG = parseInt(targetRTInputIG, 10) || 0;
     if (onUpdateKPITargets) {
       onUpdateKPITargets(selectedKPIClient, {
         clientName: selectedKPIClient,
         conversionRate: cr,
         avgResponseMinutes: rt,
+        conversionRateIG: crIG,
+        avgResponseMinutesIG: rtIG,
       });
     }
   };
@@ -1174,7 +1190,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 </select>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-1">
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
                     Target Conversion Rate (%)
@@ -1214,6 +1230,50 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     <span className="absolute right-2.5 top-1.5 text-[11px] text-slate-400 font-bold">mnt</span>
                   </div>
                   <p className="text-[10px] text-slate-400 mt-1">Maksimal jam balas CS (default: 5m)</p>
+                </div>
+              </div>
+
+              {/* Instagram KPI Targets Section */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-pink-50/50 rounded-lg border border-pink-100/80">
+                <div>
+                  <label className="text-[10px] font-bold text-pink-700 uppercase tracking-wider block mb-1">
+                    Target Conversion Rate IG (%)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      value={targetCRInputIG}
+                      onChange={(e) => setTargetCRInputIG(e.target.value)}
+                      className="w-full px-3 py-1.5 pr-7 text-xs border border-pink-200 rounded font-bold text-slate-800 focus:ring-1 focus:ring-pink-500 focus:outline-none bg-white"
+                      placeholder="15"
+                      required
+                    />
+                    <span className="absolute right-2.5 top-1.5 text-xs text-pink-500 font-bold">%</span>
+                  </div>
+                  <p className="text-[10px] text-pink-500/80 mt-1">Target closing IG (default: 15%)</p>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-pink-700 uppercase tracking-wider block mb-1">
+                    Target Response Time IG (Menit)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="1"
+                      min="1"
+                      value={targetRTInputIG}
+                      onChange={(e) => setTargetRTInputIG(e.target.value)}
+                      className="w-full px-3 py-1.5 pr-11 text-xs border border-pink-200 rounded font-bold text-slate-800 focus:ring-1 focus:ring-pink-500 focus:outline-none bg-white"
+                      placeholder="5"
+                      required
+                    />
+                    <span className="absolute right-2.5 top-1.5 text-[11px] text-pink-500 font-bold">mnt</span>
+                  </div>
+                  <p className="text-[10px] text-pink-500/80 mt-1">Maksimal balas CS IG (default: 5m)</p>
                 </div>
               </div>
 

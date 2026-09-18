@@ -30,7 +30,8 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
       'Note Customer',
       'Item Order',
       'Quantity Order (pcs)',
-      'Total Invoice (Rp)'
+      'Total Invoice (Rp)',
+      'Sumber Lead'
     ];
 
     const rows = leads.map((l) => [
@@ -46,7 +47,8 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
       (l.noteCustomer || '').replace(/\n/g, ' '),
       l.itemOrder,
       l.quantityOrder,
-      l.totalInvoice
+      l.totalInvoice,
+      l.isInstagram ? 'Instagram Bio' : 'Iklan/WA'
     ]);
 
     const tsvContent = [headers.join('\t'), ...rows.map((r) => r.join('\t'))].join('\n');
@@ -115,7 +117,8 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
               <th className="py-2.5 px-3 border-r border-slate-200 min-w-[200px]">Note Customer</th>
               <th className="py-2.5 px-3 border-r border-slate-200 min-w-[150px]">Item Order</th>
               <th className="py-2.5 px-3 border-r border-slate-200 text-right">Quantity Order</th>
-              <th className="py-2.5 px-3 text-right">Total Invoice (Rp)</th>
+              <th className="py-2.5 px-3 border-r border-slate-200 text-right">Total Invoice (Rp)</th>
+              <th className="py-2.5 px-3 font-semibold text-slate-700">Sumber Lead</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 text-slate-800">
@@ -136,7 +139,16 @@ export const SpreadsheetView: React.FC<SpreadsheetViewProps> = ({
                 </td>
                 <td className="py-2 px-3 border-r border-slate-200 font-sans font-medium">{lead.itemOrder}</td>
                 <td className="py-2 px-3 border-r border-slate-200 text-right font-bold">{lead.quantityOrder}</td>
-                <td className="py-2 px-3 text-right font-bold text-emerald-800">{formatRupiah(lead.totalInvoice)}</td>
+                <td className="py-2 px-3 border-r border-slate-200 text-right font-bold text-emerald-800">{formatRupiah(lead.totalInvoice)}</td>
+                <td className="py-2 px-3">
+                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wide border ${
+                    lead.isInstagram 
+                      ? 'bg-pink-50 text-pink-700 border-pink-200' 
+                      : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  }`}>
+                    {lead.isInstagram ? 'Instagram Bio' : 'Iklan/WA'}
+                  </span>
+                </td>
               </tr>
             ))}
           </tbody>

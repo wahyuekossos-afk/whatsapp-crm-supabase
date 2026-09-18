@@ -266,6 +266,7 @@ export function exportToExcel(leads: Lead[], filename: string = 'CRM_WhatsApp_Le
     'Item Order': lead.itemOrder,
     'Quantity Order (pcs)': lead.quantityOrder,
     'Total Invoice (Rp)': lead.totalInvoice,
+    'Sumber Lead': lead.isInstagram ? 'Instagram Bio' : 'Iklan/WA',
     'Riwayat Perubahan': JSON.stringify(lead.history || []),
   }));
 
@@ -287,6 +288,7 @@ export function exportToExcel(leads: Lead[], filename: string = 'CRM_WhatsApp_Le
     { wch: 25 }, // Item Order
     { wch: 16 }, // Qty
     { wch: 18 }, // Total Invoice
+    { wch: 18 }, // Sumber Lead
     { wch: 40 }, // Riwayat Perubahan
   ];
 
@@ -314,6 +316,7 @@ export function exportToCSV(leads: Lead[], filename: string = 'CRM_WhatsApp_Lead
     'Item Order',
     'Quantity Order (pcs)',
     'Total Invoice (Rp)',
+    'Sumber Lead',
     'Riwayat Perubahan'
   ];
 
@@ -332,6 +335,7 @@ export function exportToCSV(leads: Lead[], filename: string = 'CRM_WhatsApp_Lead
     `"${(lead.itemOrder || '').replace(/"/g, '""')}"`,
     lead.quantityOrder || 0,
     lead.totalInvoice || 0,
+    `"${lead.isInstagram ? 'Instagram Bio' : 'Iklan/WA'}"`,
     `"${JSON.stringify(lead.history || []).replace(/"/g, '""')}"`
   ]);
 

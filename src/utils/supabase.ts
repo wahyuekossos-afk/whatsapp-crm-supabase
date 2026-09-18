@@ -272,7 +272,8 @@ export async function dbGetLeads(): Promise<Lead[]> {
       isNewUpload: false,
       designerName: l.designer_name || undefined,
       designDeadlineDays: l.design_deadline_days ? Number(l.design_deadline_days) : undefined,
-      designStartedAt: l.design_started_at || undefined
+      designStartedAt: l.design_started_at || undefined,
+      isInstagram: l.is_instagram || false
     }));
   } catch (e) {
     console.error('Error fetching Leads from Supabase:', e);
@@ -308,7 +309,8 @@ export async function dbUpsertLead(lead: Lead): Promise<void> {
         riwayat_repeat_order: lead.riwayatRepeatOrder || null,
         designer_name: lead.designerName || null,
         design_deadline_days: lead.designDeadlineDays || null,
-        design_started_at: lead.designStartedAt || null
+        design_started_at: lead.designStartedAt || null,
+        is_instagram: lead.isInstagram || false
       });
     if (error) throw error;
   } catch (e) {
@@ -344,7 +346,8 @@ export async function dbBulkUpsertLeads(leads: Lead[]): Promise<void> {
       riwayat_repeat_order: l.riwayatRepeatOrder || null,
       designer_name: l.designerName || null,
       design_deadline_days: l.designDeadlineDays || null,
-      design_started_at: l.designStartedAt || null
+      design_started_at: l.designStartedAt || null,
+      is_instagram: l.isInstagram || false
     }));
     const { error } = await supabase
       .from('leads')
@@ -439,7 +442,9 @@ export async function dbGetKPITargets(): Promise<KPITargetsMap> {
       map[k.client_name] = {
         clientName: k.client_name,
         conversionRate: Number(k.conversion_rate || 15),
-        avgResponseMinutes: Number(k.avg_response_minutes || 5)
+        avgResponseMinutes: Number(k.avg_response_minutes || 5),
+        conversionRateIG: k.conversion_rate_ig !== undefined && k.conversion_rate_ig !== null ? Number(k.conversion_rate_ig) : undefined,
+        avgResponseMinutesIG: k.avg_response_minutes_ig !== undefined && k.avg_response_minutes_ig !== null ? Number(k.avg_response_minutes_ig) : undefined
       };
     });
     return map;
@@ -458,7 +463,9 @@ export async function dbUpsertKPITarget(clientName: string, kpi: KPITargets): Pr
       .upsert({
         client_name: clientName,
         conversion_rate: kpi.conversionRate,
-        avg_response_minutes: kpi.avgResponseMinutes
+        avg_response_minutes: kpi.avgResponseMinutes,
+        conversion_rate_ig: kpi.conversionRateIG !== undefined ? kpi.conversionRateIG : null,
+        avg_response_minutes_ig: kpi.avgResponseMinutesIG !== undefined ? kpi.avgResponseMinutesIG : null
       });
     if (error) throw error;
   } catch (e) {
@@ -790,7 +797,9 @@ export async function dbBulkSeed(data: {
       const payload = kpiKeys.map(k => ({
         client_name: k,
         conversion_rate: data.kpiTargetsMap[k].conversionRate,
-        avg_response_minutes: data.kpiTargetsMap[k].avgResponseMinutes
+        avg_response_minutes: data.kpiTargetsMap[k].avgResponseMinutes,
+        conversion_rate_ig: data.kpiTargetsMap[k].conversionRateIG !== undefined ? data.kpiTargetsMap[k].conversionRateIG : null,
+        avg_response_minutes_ig: data.kpiTargetsMap[k].avgResponseMinutesIG !== undefined ? data.kpiTargetsMap[k].avgResponseMinutesIG : null
       }));
       const { error } = await supabase.from('kpi_targets').upsert(payload);
       if (error) throw new Error(`KPI Targets seed failed: ${error.message}`);
@@ -957,7 +966,9 @@ CREATE TABLE IF NOT EXISTS leads (
 CREATE TABLE IF NOT EXISTS kpi_targets (
     client_name TEXT PRIMARY KEY,
     conversion_rate NUMERIC DEFAULT 15,
-    avg_response_minutes NUMERIC DEFAULT 5
+    avg_response_minutes NUMERIC DEFAULT 5,
+    conversion_rate_ig NUMERIC DEFAULT 15,
+    avg_response_minutes_ig NUMERIC DEFAULT 5
 );
 
 -- 5. Tabel Products

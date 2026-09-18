@@ -49,6 +49,7 @@ import { CreateDashboardModal } from './components/CreateDashboardModal';
 import { SpreadsheetView } from './components/SpreadsheetView';
 import { CSPerformanceView } from './components/CSPerformanceView';
 import { AdminView } from './components/AdminView';
+import { InstagramLeadsView } from './components/InstagramLeadsView';
 import { AdminAuthModal } from './components/AdminAuthModal';
 import { CheckCircle2, Database, Loader2 } from 'lucide-react';
 
@@ -93,6 +94,12 @@ const INITIAL_DASHBOARDS: DashboardClient[] = [
     id: 'dash-default',
     name: 'Wibu Sales (Utama)',
     description: 'Dashboard Sales & Leads Utama',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'dash-sanpota',
+    name: 'Sanpota',
+    description: 'Dashboard Sales & Leads Sanpota',
     createdAt: new Date().toISOString(),
   },
 ];
@@ -556,12 +563,12 @@ export default function App() {
   };
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'spreadsheet' | 'cs-performance' | 'admin'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'instagram-leads' | 'spreadsheet' | 'cs-performance' | 'admin'>('dashboard');
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
   const [isDashboardAuthModalOpen, setIsDashboardAuthModalOpen] = useState(false);
 
-  const handleSelectTab = (tab: 'dashboard' | 'spreadsheet' | 'cs-performance' | 'admin') => {
+  const handleSelectTab = (tab: 'dashboard' | 'instagram-leads' | 'spreadsheet' | 'cs-performance' | 'admin') => {
     if (tab === 'admin' && !isAdminAuthenticated) {
       setIsAdminAuthModalOpen(true);
       return;
@@ -1352,6 +1359,14 @@ export default function App() {
     return true;
   });
 
+  const adsLeadsOnly = useMemo(() => {
+    return dashboardBelongingLeads.filter((l) => l.isInstagram !== true);
+  }, [dashboardBelongingLeads]);
+
+  const adsLeadsFilteredOnly = useMemo(() => {
+    return dashboardFilteredLeads.filter((l) => l.isInstagram !== true);
+  }, [dashboardFilteredLeads]);
+
   return (
     <div className="min-h-screen bg-slate-100 font-sans text-slate-900 flex flex-col selection:bg-emerald-500 selection:text-white">
       {/* Toast Notification */}
@@ -1376,7 +1391,8 @@ export default function App() {
         onResetData={handleResetData}
         activeTab={activeTab}
         setActiveTab={handleSelectTab}
-        totalLeadsCount={dashboardBelongingLeads.length}
+        totalLeadsCount={adsLeadsOnly.length}
+        totalInstagramLeadsCount={dashboardBelongingLeads.filter(l => l.isInstagram === true).length}
         linkedSpreadsheetName={spreadsheetConfig.fileName}
         onSyncGoogleSheets={() => handleSyncFromGoogleSheets()}
         isSpreadsheetConnected={!!(spreadsheetConfig.spreadsheetId && spreadsheetConfig.spreadsheetId.trim() !== '')}
@@ -1393,13 +1409,13 @@ export default function App() {
             <DashboardDateFilter
               filters={filters}
               setFilters={setFilters}
-              totalFilteredCount={dashboardFilteredLeads.length}
-              totalAllCount={dashboardBelongingLeads.length}
+              totalFilteredCount={adsLeadsFilteredOnly.length}
+              totalAllCount={adsLeadsOnly.length}
             />
 
             {/* KPI Summary Cards */}
             <DashboardKPI
-              leads={dashboardFilteredLeads}
+              leads={adsLeadsFilteredOnly}
               kpiTargets={
                 kpiTargetsMap[activeDashboardName] || {
                   clientName: activeDashboardName,
@@ -1411,14 +1427,14 @@ export default function App() {
 
             {/* Pipeline Stages Funnel */}
             <PipelineFunnel
-              leads={dashboardFilteredLeads}
+              leads={adsLeadsFilteredOnly}
               selectedCategory={filters.kategoriFlow}
               onSelectCategory={(cat) => setFilters((prev) => ({ ...prev, kategoriFlow: cat }))}
             />
 
             {/* Main Leads Table (13 Columns + Filters + Actions) */}
             <LeadTable
-              leads={dashboardBelongingLeads}
+              leads={adsLeadsOnly}
               onUpdateLead={handleSaveUpdatedLead}
               onOpenEditModal={handleOpenEditModal}
               onOpenHistoryModal={handleOpenHistoryModal}
@@ -1428,6 +1444,26 @@ export default function App() {
               csListNames={csListNames}
             />
           </div>
+        )}
+
+        {/* TAB 1.5: INSTAGRAM LEADS */}
+        {activeTab === 'instagram-leads' && (
+          <InstagramLeadsView
+            leads={leads}
+            onUpdateLead={handleSaveUpdatedLead}
+            onOpenEditModal={handleOpenEditModal}
+            onOpenHistoryModal={handleOpenHistoryModal}
+            onDeleteLead={handleDeleteLead}
+            csListNames={csListNames}
+            dashboardBelongingCSList={dashboardBelongingCSList}
+            currentCS={currentCS}
+            onSaveNewLead={handleSaveNewLead}
+            activeDashboardName={activeDashboardName}
+            productsMap={productsMap}
+            existingCities={existingCities}
+            designers={designers}
+            kpiTargetsMap={kpiTargetsMap}
+          />
         )}
 
         {/* TAB 2: SPREADSHEET RAW GRID VIEW */}

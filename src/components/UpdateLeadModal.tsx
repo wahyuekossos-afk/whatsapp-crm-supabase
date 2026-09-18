@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Lead, FlowCategory, LostReason, CSUser, RepeatOrderItem, RepeatOrderLog, ProductsMap } from '../types';
 import { FLOW_CATEGORIES, REASONS_FOR_LOST, INDONESIAN_CITIES } from '../data/initialData';
 import { formatRupiah, formatHistoryTimestamp, getProductsForDashboard } from '../utils/spreadsheet';
-import { X, Edit3, AlertCircle, Save, Lock, Plus, Trash2, RotateCw, ShoppingBag } from 'lucide-react';
+import { X, Edit3, AlertCircle, Save, Lock, Plus, Trash2, RotateCw, ShoppingBag, Instagram } from 'lucide-react';
 import { ProductSelect } from './ProductSelect';
 
 interface UpdateLeadModalProps {
@@ -324,10 +324,18 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
         
         {/* Modal Header */}
         <div className={`px-4 py-3 sm:px-6 sm:py-3.5 flex items-center justify-between text-white shrink-0 sticky top-0 z-10 shadow-xs transition-colors ${
-          kategoriFlow === 'Repeat Order' ? 'bg-teal-900' : 'bg-slate-900'
+          lead.isInstagram
+            ? 'bg-gradient-to-r from-pink-600 via-pink-700 to-rose-700'
+            : kategoriFlow === 'Repeat Order'
+            ? 'bg-teal-900'
+            : 'bg-slate-900'
         }`}>
           <div className="flex items-center gap-2.5">
-            {kategoriFlow === 'Repeat Order' ? (
+            {lead.isInstagram ? (
+              <div className="p-1.5 bg-pink-500/25 rounded-lg border border-pink-400/30">
+                <Instagram className="w-4 h-4 sm:w-5 sm:h-5 text-pink-200" />
+              </div>
+            ) : kategoriFlow === 'Repeat Order' ? (
               <div className="p-1.5 bg-teal-800 rounded-lg">
                 <RotateCw className="w-4 h-4 sm:w-5 sm:h-5 text-teal-300" />
               </div>
@@ -336,7 +344,9 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
             )}
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm sm:text-base text-white leading-tight">Update Lead Existing</h3>
+                <h3 className="font-bold text-sm sm:text-base text-white leading-tight">
+                  {lead.isInstagram ? 'Update Lead Existing Instagram' : 'Update Lead Existing'}
+                </h3>
                 {kategoriFlow === 'Repeat Order' && (
                   <span className="px-2 py-0.5 text-[9px] font-extrabold bg-teal-400 text-teal-950 rounded-full uppercase tracking-wider">
                     Repeat Order
@@ -731,7 +741,9 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
               <button
                 type="submit"
                 className={`px-5 py-2.5 sm:py-2 rounded-lg font-bold text-xs text-white shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer flex-1 sm:flex-initial ${
-                  kategoriFlow === 'Repeat Order'
+                  lead.isInstagram
+                    ? 'bg-pink-600 hover:bg-pink-500 active:bg-pink-700 shadow-pink-600/20'
+                    : kategoriFlow === 'Repeat Order'
                     ? 'bg-teal-600 hover:bg-teal-500 active:bg-teal-700 shadow-teal-600/20'
                     : 'bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 shadow-indigo-600/20'
                 }`}

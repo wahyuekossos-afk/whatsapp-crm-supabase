@@ -11,7 +11,8 @@ import {
   ShieldCheck,
   Plus,
   FolderKanban,
-  Globe
+  Globe,
+  Instagram
 } from 'lucide-react';
 import { CSUser, DashboardClient } from '../types';
 
@@ -26,9 +27,10 @@ interface NavbarProps {
   onOpenNewLead: () => void;
   onExportExcel: () => void;
   onResetData: () => void;
-  activeTab: 'dashboard' | 'spreadsheet' | 'cs-performance' | 'admin';
-  setActiveTab: (tab: 'dashboard' | 'spreadsheet' | 'cs-performance' | 'admin') => void;
+  activeTab: 'dashboard' | 'instagram-leads' | 'spreadsheet' | 'cs-performance' | 'admin';
+  setActiveTab: (tab: 'dashboard' | 'instagram-leads' | 'spreadsheet' | 'cs-performance' | 'admin') => void;
   totalLeadsCount: number;
+  totalInstagramLeadsCount?: number;
   linkedSpreadsheetName?: string;
   onSyncGoogleSheets?: () => void;
   isSpreadsheetConnected?: boolean;
@@ -49,6 +51,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
   totalLeadsCount,
+  totalInstagramLeadsCount = 0,
   linkedSpreadsheetName = 'Main_Sales_2024.xlsx',
   onSyncGoogleSheets,
   isSpreadsheetConnected = false,
@@ -179,9 +182,24 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <LayoutDashboard className="w-3.5 h-3.5" />
-              <span>Sales Monitor Log</span>
+              <span>Ads Leads</span>
               <span className="bg-green-100 text-green-800 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
                 {totalLeadsCount}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('instagram-leads')}
+              className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded transition-all cursor-pointer ${
+                activeTab === 'instagram-leads'
+                  ? 'bg-pink-50 text-pink-700 border border-pink-200'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <Instagram className="w-3.5 h-3.5 text-pink-600" />
+              <span>Instagram Leads</span>
+              <span className="bg-pink-100 text-pink-800 text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                {totalInstagramLeadsCount}
               </span>
             </button>
 

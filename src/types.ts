@@ -86,6 +86,7 @@ export interface Lead {
   designerName?: string;
   designDeadlineDays?: number;
   designStartedAt?: string;
+  isInstagram?: boolean;
 }
 
 export interface CSUser {
@@ -120,6 +121,8 @@ export interface KPITargets {
   clientName?: string;
   conversionRate: number;
   avgResponseMinutes: number;
+  conversionRateIG?: number;
+  avgResponseMinutesIG?: number;
 }
 
 export type KPITargetsMap = Record<string, KPITargets>;
