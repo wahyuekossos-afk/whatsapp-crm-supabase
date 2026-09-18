@@ -61,14 +61,49 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
       const csLeads = leads.filter((l) => l.namaCS === cs.nama);
       const totalCount = csLeads.length;
 
-      const closed = csLeads.filter(
-        (l) => ['First Order', 'Repeat Order', 'Progres Desaign', 'Finish Desaign', 'Produksi', 'Kirim'].includes(l.kategoriFlow)
-      );
+      // Helper for checking if a lead is closed
+      const isClosed = (l: Lead) => ['First Order', 'Repeat Order', 'Progres Desaign', 'Finish Desaign', 'Produksi', 'Kirim'].includes(l.kategoriFlow);
+
+      // 1. Ads Leads Calculations
+      const adsLeads = csLeads.filter((l) => l.isInstagram !== true);
+      const totalCountAds = adsLeads.length;
+      const closedAds = adsLeads.filter(isClosed);
+      const closedCountAds = closedAds.length;
+      const revenueAds = closedAds.reduce((acc, l) => acc + (l.totalInvoice || 0), 0);
+      const conversionRateAds = totalCountAds > 0 ? (closedCountAds / totalCountAds) * 100 : 0;
+
+      let responseSumAds = 0;
+      let responseNAds = 0;
+      adsLeads.forEach((l) => {
+        if (l.jamMasuk && l.jamBalas) {
+          responseSumAds += calculateResponseMinutes(l.jamMasuk, l.jamBalas);
+          responseNAds++;
+        }
+      });
+      const avgResponseMinAds = responseNAds > 0 ? Math.round(responseSumAds / responseNAds) : 0;
+
+      // 2. Instagram Leads Calculations
+      const igLeads = csLeads.filter((l) => l.isInstagram === true);
+      const totalCountIG = igLeads.length;
+      const closedIG = igLeads.filter(isClosed);
+      const closedCountIG = closedIG.length;
+      const revenueIG = closedIG.reduce((acc, l) => acc + (l.totalInvoice || 0), 0);
+      const conversionRateIG = totalCountIG > 0 ? (closedCountIG / totalCountIG) * 100 : 0;
+
+      let responseSumIG = 0;
+      let responseNIG = 0;
+      igLeads.forEach((l) => {
+        if (l.jamMasuk && l.jamBalas) {
+          responseSumIG += calculateResponseMinutes(l.jamMasuk, l.jamBalas);
+          responseNIG++;
+        }
+      });
+      const avgResponseMinIG = responseNIG > 0 ? Math.round(responseSumIG / responseNIG) : 0;
+
+      // 3. Overall Combined Calculations
+      const closed = csLeads.filter(isClosed);
       const closedCount = closed.length;
       const revenue = closed.reduce((acc, l) => acc + (l.totalInvoice || 0), 0);
-
-      const lostCount = csLeads.filter((l) => l.kategoriFlow === 'Lost').length;
-
       const conversionRate = totalCount > 0 ? (closedCount / totalCount) * 100 : 0;
 
       let responseSum = 0;
@@ -81,10 +116,23 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
       });
       const avgResponseMin = responseN > 0 ? Math.round(responseSum / responseN) : 0;
 
+      const lostCount = csLeads.filter((l) => l.kategoriFlow === 'Lost').length;
+
       return {
         csName: cs.nama,
         role: cs.role,
         avatar: cs.avatar,
+        // Ads Leads metrics
+        totalCountAds,
+        conversionRateAds: Number(conversionRateAds.toFixed(1)),
+        revenueAds,
+        avgResponseMinAds,
+        // IG Leads metrics
+        totalCountIG,
+        conversionRateIG: Number(conversionRateIG.toFixed(1)),
+        revenueIG,
+        avgResponseMinIG,
+        // Overall metrics
         totalCount,
         closedCount,
         revenue,
@@ -95,11 +143,19 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
     });
   }, [leads, csList]);
 
-  // Chart data for Sales Flow distribution
-  const flowCategoryData = useMemo(() => {
+  // Chart data for Sales Flow distribution (Ads)
+  const flowCategoryDataAds = useMemo(() => {
     return FLOW_CATEGORIES.map((cat) => ({
       name: cat,
-      total: leads.filter((l) => l.kategoriFlow === cat).length,
+      total: leads.filter((l) => l.isInstagram !== true && l.kategoriFlow === cat).length,
+    }));
+  }, [leads]);
+
+  // Chart data for Sales Flow distribution (Instagram)
+  const flowCategoryDataIG = useMemo(() => {
+    return FLOW_CATEGORIES.map((cat) => ({
+      name: cat,
+      total: leads.filter((l) => l.isInstagram === true && l.kategoriFlow === cat).length,
     }));
   }, [leads]);
 
@@ -356,42 +412,88 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {csStats.map((cs) => (
-                <div key={cs.csName} className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 hover:bg-white transition-all space-y-3">
-                  <div className="flex items-center gap-3">
+                <div key={cs.csName} className="p-4 rounded-xl border border-slate-200 bg-white hover:border-slate-300 shadow-xs hover:shadow-sm transition-all space-y-4 flex flex-col justify-between">
+                  {/* Header: CS Profile */}
+                  <div className="flex items-center gap-3 pb-2 border-b border-slate-100">
                     <img
                       src={cs.avatar}
                       alt={cs.csName}
-                      className="w-10 h-10 rounded-full object-cover border border-slate-300"
+                      className="w-10 h-10 rounded-full object-cover border border-slate-200"
                     />
                     <div>
                       <h4 className="font-extrabold text-slate-900 text-sm">{cs.csName}</h4>
-                      <p className="text-[11px] text-slate-500">{cs.role}</p>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{cs.role}</p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/80 text-xs">
-                    <div className="bg-white p-2 rounded border border-slate-100">
-                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Total Leads</span>
-                      <span className="font-black text-slate-900 text-sm">{cs.totalCount} leads</span>
+                  {/* Body Sections */}
+                  <div className="space-y-3.5 flex-1">
+                    {/* 1. Ads Leads Section */}
+                    <div className="p-2.5 bg-blue-50/40 rounded-lg border border-blue-100/60 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-blue-700 uppercase tracking-wider">Ads Leads</span>
+                        <span className="text-[10px] bg-blue-100/80 text-blue-800 font-extrabold px-2 py-0.5 rounded-full">{cs.totalCountAds} leads</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
+                        <div>
+                          <span className="text-[9px] text-slate-400 font-bold uppercase block">Closing Rate</span>
+                          <span className="font-bold text-slate-800">{cs.conversionRateAds}%</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-slate-400 font-bold uppercase block">Omset Closing</span>
+                          <span className="font-bold text-slate-800">{formatRupiah(cs.revenueAds)}</span>
+                        </div>
+                        <div className="col-span-2 flex items-center justify-between text-[10px] pt-1.5 border-t border-blue-100/40 mt-1">
+                          <span className="text-slate-500 font-bold uppercase text-[9px]">Respon CS:</span>
+                          <span className="font-black text-slate-800">{formatResponseTime(cs.avgResponseMinAds)}</span>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="bg-emerald-50/70 p-2 rounded border border-emerald-100">
-                      <span className="text-[10px] text-emerald-600 font-bold uppercase block">Closing Rate</span>
-                      <span className="font-black text-emerald-800 text-sm">{cs.conversionRate}%</span>
+                    {/* 2. Instagram Leads Section */}
+                    <div className="p-2.5 bg-pink-50/40 rounded-lg border border-pink-100/60 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-pink-700 uppercase tracking-wider">Instagram Leads</span>
+                        <span className="text-[10px] bg-pink-100/80 text-pink-800 font-extrabold px-2 py-0.5 rounded-full">{cs.totalCountIG} leads</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
+                        <div>
+                          <span className="text-[9px] text-slate-400 font-bold uppercase block">Closing Rate</span>
+                          <span className="font-bold text-slate-800">{cs.conversionRateIG}%</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-slate-400 font-bold uppercase block">Omset Closing</span>
+                          <span className="font-bold text-slate-800">{formatRupiah(cs.revenueIG)}</span>
+                        </div>
+                        <div className="col-span-2 flex items-center justify-between text-[10px] pt-1.5 border-t border-pink-100/40 mt-1">
+                          <span className="text-slate-500 font-bold uppercase text-[9px]">Respon CS:</span>
+                          <span className="font-black text-slate-800">{formatResponseTime(cs.avgResponseMinIG)}</span>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="bg-white p-2 rounded border border-slate-100 col-span-2">
-                      <span className="text-[10px] text-slate-400 font-bold uppercase block">Omset Closing</span>
-                      <span className="font-black text-emerald-700 text-sm">{formatRupiah(cs.revenue)}</span>
-                    </div>
-
-                    <div className="bg-slate-100 p-2 rounded col-span-2 flex items-center justify-between text-[11px]">
-                      <span className="text-slate-600 font-medium flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-indigo-500" /> Respon CS:
-                      </span>
-                      <span className="font-bold text-slate-900">{formatResponseTime(cs.avgResponseMin)}</span>
+                    {/* 3. Total Combined Section */}
+                    <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200/60 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-slate-700 uppercase tracking-wider">Total</span>
+                        <span className="text-[10px] bg-slate-200/80 text-slate-800 font-extrabold px-2 py-0.5 rounded-full">{cs.totalCount} leads</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
+                        <div>
+                          <span className="text-[9px] text-slate-400 font-bold uppercase block">Closing Rate</span>
+                          <span className="font-extrabold text-emerald-600">{cs.conversionRate}%</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-slate-400 font-bold uppercase block">Omset Closing</span>
+                          <span className="font-extrabold text-emerald-600">{formatRupiah(cs.revenue)}</span>
+                        </div>
+                        <div className="col-span-2 flex items-center justify-between text-[10px] pt-1.5 border-t border-slate-200/50 mt-1">
+                          <span className="text-slate-500 font-bold uppercase text-[9px]">Respon CS:</span>
+                          <span className="font-black text-slate-800">{formatResponseTime(cs.avgResponseMin)}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -401,25 +503,42 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
 
           {/* Visual Analytics Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Pipeline Bar Chart */}
+            {/* Pipeline Ads Chart */}
             <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-sm">
-              <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wide mb-4">
-                Distribusi Lead per Pipeline Stage
+              <h4 className="font-bold text-blue-700 text-xs uppercase tracking-wide mb-4">
+                Distribusi Lead per Pipeline Stage (Ads Leads)
               </h4>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={flowCategoryData}>
-                    <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+                  <BarChart data={flowCategoryDataAds}>
+                    <XAxis dataKey="name" tick={{ fontSize: 9 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 9 }} />
                     <Tooltip />
-                    <Bar dataKey="total" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="total" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Pipeline IG Chart */}
+            <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-sm">
+              <h4 className="font-bold text-pink-700 text-xs uppercase tracking-wide mb-4">
+                Distribusi Lead per Pipeline Stage Instagram
+              </h4>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={flowCategoryDataIG}>
+                    <XAxis dataKey="name" tick={{ fontSize: 9 }} />
+                    <YAxis allowDecimals={false} tick={{ fontSize: 9 }} />
+                    <Tooltip />
+                    <Bar dataKey="total" fill="#ec4899" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
             {/* Lost Reason Breakdown */}
-            <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-sm">
+            <div className="bg-white p-5 rounded-xl border border-slate-200/90 shadow-sm lg:col-span-2">
               <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wide mb-4 flex items-center gap-1.5">
                 <AlertTriangle className="w-4 h-4 text-rose-500" /> Breakdown Utama Alasan Lost
               </h4>
