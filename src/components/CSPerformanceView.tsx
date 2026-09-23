@@ -54,6 +54,11 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
   const [summaryCSFilter, setSummaryCSFilter] = useState('');
   const [mismatchOnly, setMismatchOnly] = useState(false);
   const [showCRMDetails, setShowCRMDetails] = useState(false);
+  const [hiddenCSNames, setHiddenCSNames] = useState<string[]>([]);
+
+  const visibleCSList = useMemo(() => {
+    return csList.filter((cs) => !hiddenCSNames.includes(cs.nama));
+  }, [csList, hiddenCSNames]);
 
   // --- LEADERBOARD LOGIC & CALCULATIONS ---
   const csStats = useMemo(() => {
@@ -825,6 +830,32 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
                 </button>
               )}
             </div>
+
+            {/* Restorable Hidden CS list */}
+            {hiddenCSNames.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-xs mt-3">
+                <span className="font-bold text-slate-500">CS Tersembunyi ({hiddenCSNames.length}):</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {hiddenCSNames.map((name) => (
+                    <button
+                      key={name}
+                      onClick={() => setHiddenCSNames(prev => prev.filter(n => n !== name))}
+                      className="flex items-center gap-1 bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-600 border border-slate-200 hover:border-indigo-200 px-2.5 py-1 rounded-full text-[10px] font-bold cursor-pointer transition-all shadow-3xs"
+                      title="Klik untuk menampilkan kembali"
+                    >
+                      <span>👁️ {name}</span>
+                      <span className="text-slate-400 font-extrabold ml-1 hover:text-indigo-600">✕</span>
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setHiddenCSNames([])}
+                    className="text-[10px] text-indigo-600 hover:text-indigo-800 font-extrabold hover:underline cursor-pointer ml-1.5"
+                  >
+                    Tampilkan Semua
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Pivot Table Grid - No horizontal scroll for newest dates! */}
@@ -834,11 +865,19 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                     <th className="p-3.5 pl-5 w-44">Tanggal</th>
-                    {csList.map((cs) => (
+                    {visibleCSList.map((cs) => (
                       <th key={cs.id} className="p-3.5 min-w-48 text-center border-l border-slate-100">
                         <div className="flex flex-col items-center gap-0.5">
                           <span className="text-slate-800 text-[11px] font-black">{cs.nama}</span>
                           <span className="text-[9px] text-slate-400 normal-case font-medium">{cs.clientName || 'Global'}</span>
+                          <button
+                            type="button"
+                            onClick={() => setHiddenCSNames(prev => [...prev, cs.nama])}
+                            className="mt-1.5 text-[9px] font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 px-1.5 py-0.5 rounded border border-slate-200 hover:border-rose-200 cursor-pointer transition-all"
+                            title={`Sembunyikan kolom ${cs.nama}`}
+                          >
+                            ✕ Sembunyikan
+                          </button>
                         </div>
                       </th>
                     ))}
@@ -875,7 +914,7 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
                         </td>
 
                         {/* CS CELLS */}
-                        {csList.map((cs) => {
+                        {visibleCSList.map((cs) => {
                           const cellData = row.csData.find((cd) => cd.csName === cs.nama) || {
                             csName: cs.nama,
                             csLeadCount: 0,
@@ -938,7 +977,7 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={csList.length + 1} className="p-10 text-center text-slate-400 text-xs">
+                      <td colSpan={visibleCSList.length + 1} className="p-10 text-center text-slate-400 text-xs">
                         <div className="flex flex-col items-center gap-2">
                           <AlertTriangle className="w-8 h-8 text-slate-300" />
                           <span>Tidak ada data kecocokan yang ditemukan. Silakan input target di Admin Management.</span>
