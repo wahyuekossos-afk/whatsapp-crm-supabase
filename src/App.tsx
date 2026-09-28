@@ -1574,6 +1574,7 @@ export default function App() {
         existingCities={existingCities}
         productsMap={productsMap}
         designers={designers}
+        csList={dashboardBelongingCSList}
       />
 
       <HistoryModal

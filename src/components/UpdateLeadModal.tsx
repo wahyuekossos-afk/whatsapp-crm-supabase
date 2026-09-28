@@ -14,6 +14,7 @@ interface UpdateLeadModalProps {
   existingCities?: string[];
   productsMap?: ProductsMap;
   designers?: string[];
+  csList?: CSUser[];
 }
 
 export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
@@ -25,6 +26,7 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
   existingCities,
   productsMap,
   designers = [],
+  csList = [],
 }) => {
   if (!isOpen || !lead) return null;
 
@@ -32,6 +34,7 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
   const targetDashboard = lead.clientName || currentCS.clientName || 'Wibu Sales (Utama)';
   const productOptions = getProductsForDashboard(productsMap, targetDashboard);
 
+  const [namaCS, setNamaCS] = useState(lead.namaCS || '');
   const [kategoriFlow, setKategoriFlow] = useState<FlowCategory>(lead.kategoriFlow);
   const [namaCustomer, setNamaCustomer] = useState(lead.namaCustomer || '');
   const [nomorWA, setNomorWA] = useState(lead.nomorWA || '');
@@ -65,6 +68,7 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
 
   useEffect(() => {
     if (lead) {
+      setNamaCS(lead.namaCS || '');
       setKategoriFlow(lead.kategoriFlow);
       setNamaCustomer(lead.namaCustomer || '');
       setNomorWA(lead.nomorWA || '');
@@ -177,6 +181,10 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
     e.preventDefault();
     setErrorMsg('');
 
+    if (!namaCS.trim()) {
+      return setErrorMsg('VALIDASI KHUSUS: Nama CS wajib diisi!');
+    }
+
     if (!nomorWA.trim()) {
       return setErrorMsg('VALIDASI: Nomor WhatsApp wajib diisi!');
     }
@@ -275,6 +283,7 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
 
     const updatedLead: Lead = {
       ...lead, // Preserves other fields
+      namaCS: namaCS.trim(),
       namaCustomer,
       nomorWA: nomorWA.trim(),
       tanggalMasuk,
@@ -301,11 +310,12 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
           toFlow: kategoriFlow,
           note:
             updateLogNote ||
+            ((namaCS !== lead.namaCS ? `Ubah CS dari ${lead.namaCS} ke ${namaCS}. ` : '') +
             (kategoriFlow === 'Repeat Order'
               ? `Repeat Order Baru (${calcCurrentRepeatQty} pcs, ${formatRupiah(calcCurrentRepeatInvoice)})`
               : kategoriFlow === 'Progres Desaign'
               ? `${kategoriFlow} ${finalQuantityOrder} pcs, ${formatRupiah(finalTotalInvoice)} (Deadline: ${designDeadlineDays} hari)`
-              : `Update status ke ${kategoriFlow}`),
+              : `Update status ke ${kategoriFlow}`)),
           itemOrder: finalItemOrderStr,
           quantityOrder: finalQuantityOrder,
           totalInvoice: finalTotalInvoice,
@@ -380,7 +390,36 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
           <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5 text-xs text-slate-800">
             
              {/* Locked / Read-Only Header (No Need to Re-Input) */}
-            <div className="p-2.5 sm:p-3 bg-slate-100/90 border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+            <div className="p-2.5 sm:p-3 bg-slate-100/90 border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
+              <div>
+                <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
+                  👤 Nama CS <span className="text-rose-500 font-bold">*</span>
+                </span>
+                <select
+                  value={namaCS}
+                  onChange={(e) => setNamaCS(e.target.value)}
+                  className="w-full px-2 py-1 text-xs bg-white border border-slate-300 rounded-md font-bold text-slate-900 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  required
+                >
+                  {csList && csList.length > 0 ? (
+                    <>
+                      {lead.namaCS && !csList.some((c) => c.nama === lead.namaCS) && (
+                        <option value={lead.namaCS}>
+                          {lead.namaCS} (Saat ini)
+                        </option>
+                      )}
+                      {csList.map((cs) => (
+                        <option key={cs.id} value={cs.nama}>
+                          {cs.nama} ({cs.role}){cs.clientName ? ` - ${cs.clientName}` : ''}
+                        </option>
+                      ))}
+                    </>
+                  ) : (
+                    <option value={lead.namaCS}>{lead.namaCS}</option>
+                  )}
+                </select>
+              </div>
+
               <div>
                 <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 mb-1">
                   ✏️ Nama Customer <span className="text-rose-500 font-bold">*</span>
