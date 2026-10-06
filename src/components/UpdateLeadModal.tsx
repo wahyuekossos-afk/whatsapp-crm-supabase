@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Lead, FlowCategory, LostReason, CSUser, RepeatOrderItem, RepeatOrderLog, ProductsMap } from '../types';
 import { FLOW_CATEGORIES, REASONS_FOR_LOST, INDONESIAN_CITIES } from '../data/initialData';
 import { formatRupiah, formatHistoryTimestamp, getProductsForDashboard } from '../utils/spreadsheet';
-import { X, Edit3, AlertCircle, Save, Lock, Plus, Trash2, RotateCw, ShoppingBag, Instagram } from 'lucide-react';
+import { X, Edit3, AlertCircle, Save, Lock, Plus, Trash2, RotateCw, ShoppingBag, Instagram, Check } from 'lucide-react';
 import { ProductSelect } from './ProductSelect';
 
 interface UpdateLeadModalProps {
@@ -65,6 +65,7 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
 
   const [updateLogNote, setUpdateLogNote] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isNewRepeat, setIsNewRepeat] = useState<boolean>(true);
 
   useEffect(() => {
     if (lead) {
@@ -85,16 +86,53 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
       setUpdateLogNote('');
       setErrorMsg('');
 
+      const initiallyRepeat = lead.kategoriFlow === 'Repeat Order';
+      setIsNewRepeat(!initiallyRepeat); // default to edit/update if already Repeat Order status!
+
       // Initialize repeat items
-      if (lead.kategoriFlow === 'Repeat Order') {
-        setRepeatItems([
-          {
-            id: `item-${Date.now()}`,
-            itemOrder: lead.itemOrder || '',
-            quantityOrder: lead.quantityOrder || 1,
-            totalInvoice: 0,
-          },
-        ]);
+      if (initiallyRepeat) {
+        let latestLog: RepeatOrderLog | null = null;
+        if (lead.riwayatRepeatOrder) {
+          try {
+            const parsed = JSON.parse(lead.riwayatRepeatOrder);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              latestLog = parsed[0]; // first is latest
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        if (latestLog) {
+          const initialItems = latestLog.items && latestLog.items.length > 0
+            ? latestLog.items.map((it) => ({
+                id: it.id || `item-${Date.now()}-${Math.random()}`,
+                itemOrder: it.itemOrder,
+                quantityOrder: it.quantityOrder || 1,
+                totalInvoice: it.totalInvoice || 0,
+              }))
+            : [
+                {
+                  id: `item-${Date.now()}`,
+                  itemOrder: lead.itemOrder || '',
+                  quantityOrder: lead.quantityOrder || 1,
+                  totalInvoice: lead.totalInvoice || 0,
+                },
+              ];
+          setRepeatItems(initialItems);
+          if (latestLog.note) {
+            setUpdateLogNote(latestLog.note);
+          }
+        } else {
+          setRepeatItems([
+            {
+              id: `item-${Date.now()}`,
+              itemOrder: lead.itemOrder || '',
+              quantityOrder: lead.quantityOrder || 1,
+              totalInvoice: lead.totalInvoice || 0,
+            },
+          ]);
+        }
       } else {
         setRepeatItems([
           {
@@ -153,6 +191,61 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
     );
   };
 
+  const handleToggleNewRepeat = (val: boolean) => {
+    setIsNewRepeat(val);
+    if (val) {
+      setRepeatItems([
+        {
+          id: `item-${Date.now()}`,
+          itemOrder: lead?.itemOrder || '',
+          quantityOrder: 1,
+          totalInvoice: 0,
+        },
+      ]);
+      setUpdateLogNote('');
+    } else {
+      let latestLog: RepeatOrderLog | null = null;
+      if (lead?.riwayatRepeatOrder) {
+        try {
+          const parsed = JSON.parse(lead.riwayatRepeatOrder);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            latestLog = parsed[0];
+          }
+        } catch {
+          // ignore
+        }
+      }
+      if (latestLog) {
+        const initialItems = latestLog.items && latestLog.items.length > 0
+          ? latestLog.items.map((it) => ({
+              id: it.id || `item-${Date.now()}-${Math.random()}`,
+              itemOrder: it.itemOrder,
+              quantityOrder: it.quantityOrder || 1,
+              totalInvoice: it.totalInvoice || 0,
+            }))
+          : [
+              {
+                id: `item-${Date.now()}`,
+                itemOrder: lead?.itemOrder || '',
+                quantityOrder: lead?.quantityOrder || 1,
+                totalInvoice: lead?.totalInvoice || 0,
+              },
+            ];
+        setRepeatItems(initialItems);
+        if (latestLog.note) setUpdateLogNote(latestLog.note);
+      } else {
+        setRepeatItems([
+          {
+            id: `item-${Date.now()}`,
+            itemOrder: lead?.itemOrder || '',
+            quantityOrder: lead?.quantityOrder || 1,
+            totalInvoice: lead?.totalInvoice || 0,
+          },
+        ]);
+      }
+    }
+  };
+
   // Calculations for Current Repeat Order
   const calcCurrentRepeatQty = repeatItems.reduce(
     (acc, item) => acc + (Number(item.quantityOrder) || 0),
@@ -167,14 +260,33 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
   const existingLifetimeInvoice = lead.totalInvoice || 0;
   const existingLifetimeQty = lead.quantityOrder || 0;
 
+  // Find the latest repeat order log old values to support updating/correcting them
+  let latestLogOldInvoice = 0;
+  let latestLogOldQty = 0;
+  if (lead?.riwayatRepeatOrder) {
+    try {
+      const parsed = JSON.parse(lead.riwayatRepeatOrder);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        latestLogOldInvoice = parsed[0].totalInvoice || 0;
+        latestLogOldQty = parsed[0].totalQuantity || 0;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   const calcLifetimeInvoice =
     kategoriFlow === 'Repeat Order'
-      ? existingLifetimeInvoice + calcCurrentRepeatInvoice
+      ? isNewRepeat
+        ? existingLifetimeInvoice + calcCurrentRepeatInvoice
+        : existingLifetimeInvoice - latestLogOldInvoice + calcCurrentRepeatInvoice
       : Number(totalInvoice) || 0;
 
   const calcLifetimeQty =
     kategoriFlow === 'Repeat Order'
-      ? existingLifetimeQty + calcCurrentRepeatQty
+      ? isNewRepeat
+        ? existingLifetimeQty + calcCurrentRepeatQty
+        : existingLifetimeQty - latestLogOldQty + calcCurrentRepeatQty
       : Number(quantityOrder) || 0;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -267,17 +379,44 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
         ];
       }
 
-      const newLog: RepeatOrderLog = {
-        id: `ro-${Date.now()}`,
-        timestamp: nowStr,
-        csName: namaCS.trim(),
-        items: validItems,
-        totalQuantity: calcCurrentRepeatQty,
-        totalInvoice: calcCurrentRepeatInvoice,
-        note: updateLogNote || `Repeat Order (${itemsSummaryText})`,
-      };
+      if (isNewRepeat) {
+        // TAMBAH REPEAT ORDER BARU (create a new log entry)
+        const newLog: RepeatOrderLog = {
+          id: `ro-${Date.now()}`,
+          timestamp: nowStr,
+          csName: namaCS.trim(),
+          items: validItems,
+          totalQuantity: calcCurrentRepeatQty,
+          totalInvoice: calcCurrentRepeatInvoice,
+          note: updateLogNote || `Repeat Order (${itemsSummaryText})`,
+        };
 
-      existingLogs.unshift(newLog); // latest first
+        existingLogs.unshift(newLog); // latest first
+      } else {
+        // UPDATE/KOREKSI REPEAT ORDER TERAKHIR (modify the first element of the array)
+        if (existingLogs.length > 0) {
+          existingLogs[0] = {
+            ...existingLogs[0],
+            csName: namaCS.trim(),
+            items: validItems,
+            totalQuantity: calcCurrentRepeatQty,
+            totalInvoice: calcCurrentRepeatInvoice,
+            note: updateLogNote || `Repeat Order (${itemsSummaryText})`,
+          };
+        } else {
+          // Fallback if somehow there was no log, create one
+          const newLog: RepeatOrderLog = {
+            id: `ro-${Date.now()}`,
+            timestamp: nowStr,
+            csName: namaCS.trim(),
+            items: validItems,
+            totalQuantity: calcCurrentRepeatQty,
+            totalInvoice: calcCurrentRepeatInvoice,
+            note: updateLogNote || `Repeat Order (${itemsSummaryText})`,
+          };
+          existingLogs.unshift(newLog);
+        }
+      }
       newRiwayatRepeatStr = JSON.stringify(existingLogs);
     }
 
@@ -312,7 +451,9 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
             updateLogNote ||
             ((namaCS !== lead.namaCS ? `Ubah CS dari ${lead.namaCS} ke ${namaCS}. ` : '') +
             (kategoriFlow === 'Repeat Order'
-              ? `Repeat Order Baru (${calcCurrentRepeatQty} pcs, ${formatRupiah(calcCurrentRepeatInvoice)})`
+              ? isNewRepeat
+                ? `Repeat Order Baru (${calcCurrentRepeatQty} pcs, ${formatRupiah(calcCurrentRepeatInvoice)})`
+                : `Update Repeat Order Terakhir (${calcCurrentRepeatQty} pcs, ${formatRupiah(calcCurrentRepeatInvoice)})`
               : kategoriFlow === 'Progres Desaign'
               ? `${kategoriFlow} ${finalQuantityOrder} pcs, ${formatRupiah(finalTotalInvoice)} (Deadline: ${designDeadlineDays} hari)`
               : `Update status ke ${kategoriFlow}`)),
@@ -576,10 +717,40 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
             {/* SPECIAL SECTION: REPEAT ORDER MULTI-ITEM ORDER FORM */}
             {kategoriFlow === 'Repeat Order' ? (
               <div className="p-3 sm:p-4 bg-teal-50/70 border border-teal-200 rounded-xl space-y-3 shadow-2xs">
-                <div className="flex items-center justify-between border-b border-teal-200/80 pb-2">
+                {/* Segemented Toggle Tab to Choose Mode */}
+                {lead.kategoriFlow === 'Repeat Order' && (
+                  <div className="flex bg-teal-100/60 p-1 rounded-lg border border-teal-200/60 text-[10px] sm:text-xs font-bold w-full sm:w-fit self-start gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleNewRepeat(false)}
+                      className={`flex-1 sm:flex-initial px-3 py-1 rounded transition-all cursor-pointer text-center ${
+                        !isNewRepeat
+                          ? 'bg-teal-700 text-white shadow-xs'
+                          : 'text-teal-700 hover:text-teal-900 hover:bg-teal-100/30'
+                      }`}
+                    >
+                      🔄 Update Repeat Order Terakhir
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleNewRepeat(true)}
+                      className={`flex-1 sm:flex-initial px-3 py-1 rounded transition-all cursor-pointer text-center ${
+                        isNewRepeat
+                          ? 'bg-teal-700 text-white shadow-xs'
+                          : 'text-teal-700 hover:text-teal-900 hover:bg-teal-100/30'
+                      }`}
+                    >
+                      ➕ Tambah Repeat Order Baru
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between border-b border-teal-200/80 pb-2 pt-1">
                   <div className="flex items-center gap-1.5 text-teal-900">
                     <RotateCw className="w-3.5 h-3.5 text-teal-600 shrink-0 animate-spin-slow" />
-                    <span className="font-extrabold text-[11px] sm:text-xs uppercase tracking-wider">Input Pesanan Repeat Order</span>
+                    <span className="font-extrabold text-[11px] sm:text-xs uppercase tracking-wider">
+                      {!isNewRepeat ? 'Koreksi Data Repeat Order Terakhir' : 'Input Pesanan Repeat Order Baru'}
+                    </span>
                   </div>
                   <button
                     type="button"
@@ -783,16 +954,35 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
                   lead.isInstagram
                     ? 'bg-pink-600 hover:bg-pink-500 active:bg-pink-700 shadow-pink-600/20'
                     : kategoriFlow === 'Repeat Order'
-                    ? 'bg-teal-600 hover:bg-teal-500 active:bg-teal-700 shadow-teal-600/20'
-                    : 'bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 shadow-indigo-600/20'
+                    ? isNewRepeat
+                      ? 'bg-teal-600 hover:bg-teal-500 active:bg-teal-700 shadow-teal-600/20'
+                      : 'bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 shadow-indigo-600/20'
+                    : 'bg-slate-900 hover:bg-slate-800'
                 }`}
               >
-                <Save className="w-4 h-4" />
-                <span>
-                  {kategoriFlow === 'Repeat Order'
-                    ? 'Simpan Repeat Order'
-                    : 'Simpan Update'}
-                </span>
+                {kategoriFlow === 'Repeat Order' ? (
+                  isNewRepeat ? (
+                    <>
+                      <RotateCw className="w-3.5 h-3.5" />
+                      <span>Simpan Repeat Order Baru</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Update Repeat Order Terakhir</span>
+                    </>
+                  )
+                ) : lead.isInstagram ? (
+                  <>
+                    <Instagram className="w-3.5 h-3.5" />
+                    <span>Simpan Progress IG</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Simpan Progress Lead</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
