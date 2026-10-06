@@ -1227,66 +1227,68 @@ export const AdminView: React.FC<AdminViewProps> = ({
               </div>
             </div>
 
-            <form onSubmit={handleSaveMetaChat} className="space-y-3">
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                  Tanggal <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={metaDate}
-                  onChange={(e) => setMetaDate(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
-                  required
-                />
+            <form onSubmit={handleSaveMetaChat} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Tanggal <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={metaDate}
+                    onChange={(e) => setMetaDate(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Pilih Petugas CS <span className="text-slate-400 font-semibold">(Target chat)</span>
+                  </label>
+                  <select
+                    value={metaCSName}
+                    onChange={(e) => setMetaCSName(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white cursor-pointer"
+                  >
+                    <option value="">-- Pilih CS (Kosongkan jika hanya input Kondisi) --</option>
+                    {csList.map((cs) => (
+                      <option key={cs.id} value={cs.nama}>
+                        👤 {cs.nama} ({cs.clientName || 'Global'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Jumlah Chat Masuk (Meta) <span className="text-slate-400 font-semibold">(Wajib jika CS dipilih)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={metaChatCount}
+                    onChange={(e) => setMetaChatCount(e.target.value)}
+                    placeholder="Contoh: 40"
+                    className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Kondisi Hari <span className="text-slate-400 font-semibold">(Opsional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={metaKondisi}
+                    onChange={(e) => setMetaKondisi(e.target.value)}
+                    placeholder="Contoh: Iklan mati atau Libur"
+                    className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                  Pilih Petugas CS <span className="text-slate-400 font-semibold">(Wajib jika input target chat)</span>
-                </label>
-                <select
-                  value={metaCSName}
-                  onChange={(e) => setMetaCSName(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white cursor-pointer"
-                >
-                  <option value="">-- Pilih CS (Kosongkan jika hanya input Kondisi Hari) --</option>
-                  {csList.map((cs) => (
-                    <option key={cs.id} value={cs.nama}>
-                      👤 {cs.nama} ({cs.clientName || 'Global'})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                  Jumlah Chat Masuk (Meta) <span className="text-slate-400 font-semibold">(Wajib jika petugas CS dipilih)</span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={metaChatCount}
-                  onChange={(e) => setMetaChatCount(e.target.value)}
-                  placeholder="Contoh: 40"
-                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                  Kondisi Hari <span className="text-slate-400 font-semibold">(Opsional - e.g. "Iklan Mati", "Libur")</span>
-                </label>
-                <input
-                  type="text"
-                  value={metaKondisi}
-                  onChange={(e) => setMetaKondisi(e.target.value)}
-                  placeholder="Contoh: Iklan mati atau Libur"
-                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
-                />
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-100 justify-end">
                 <button
                   type="submit"
                   disabled={isSavingMeta}

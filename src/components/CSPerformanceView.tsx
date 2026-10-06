@@ -873,10 +873,10 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
                           <button
                             type="button"
                             onClick={() => setHiddenCSNames(prev => [...prev, cs.nama])}
-                            className="mt-1.5 text-[9px] font-bold text-slate-400 hover:text-rose-600 hover:bg-rose-50 px-1.5 py-0.5 rounded border border-slate-200 hover:border-rose-200 cursor-pointer transition-all"
+                            className="mt-1.5 text-[10px] font-bold text-red-500 hover:text-white bg-red-50 hover:bg-red-500 px-2.5 py-1 rounded-md border border-red-200 hover:border-red-500 cursor-pointer transition-all shadow-3xs flex items-center justify-center gap-1"
                             title={`Sembunyikan kolom ${cs.nama}`}
                           >
-                            ✕ Sembunyikan
+                            <span>✕ Hide</span>
                           </button>
                         </div>
                       </th>
