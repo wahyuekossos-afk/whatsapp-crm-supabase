@@ -1584,6 +1584,8 @@ export default function App() {
           setIsHistoryOpen(false);
           setSelectedLeadForHistory(null);
         }}
+        onSave={handleSaveUpdatedLead}
+        csList={dashboardBelongingCSList}
       />
 
       <AdminAuthModal

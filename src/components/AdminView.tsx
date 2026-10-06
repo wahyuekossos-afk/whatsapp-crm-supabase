@@ -504,6 +504,68 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [metaKondisi, setMetaKondisi] = useState<string>('');
   const [isSavingMeta, setIsSavingMeta] = useState<boolean>(false);
 
+  // Meta Chats Filters and Editing State
+  const [filterMetaDate, setFilterMetaDate] = useState('');
+  const [filterMetaMonth, setFilterMetaMonth] = useState('');
+  const [filterMetaYear, setFilterMetaYear] = useState('');
+  const [editingMetaIndex, setEditingMetaIndex] = useState<string | null>(null);
+  const [editMetaChatCount, setEditMetaChatCount] = useState<number>(0);
+  const [editMetaKondisi, setEditMetaKondisi] = useState<string>('');
+
+  const uniqueMetaYears = useMemo(() => {
+    if (!metaChats) return [];
+    const years = metaChats.map((mc) => {
+      if (!mc || !mc.tanggal) return '';
+      return mc.tanggal.split('-')[0];
+    }).filter(Boolean);
+    return Array.from(new Set(years)).sort((a, b) => b.localeCompare(a));
+  }, [metaChats]);
+
+  const filteredMetaChats = useMemo(() => {
+    if (!metaChats) return [];
+    return metaChats.filter((mc) => {
+      if (!mc || !mc.tanggal) return false;
+      const parts = mc.tanggal.split('-');
+      if (parts.length < 2) return false;
+      const year = parts[0];
+      const month = parts[1];
+      
+      if (filterMetaDate && mc.tanggal !== filterMetaDate) {
+        return false;
+      }
+      if (filterMetaMonth && month !== filterMetaMonth) {
+        return false;
+      }
+      if (filterMetaYear && year !== filterMetaYear) {
+        return false;
+      }
+      return true;
+    });
+  }, [metaChats, filterMetaDate, filterMetaMonth, filterMetaYear]);
+
+  const handleStartEditMeta = (mc: MetaChat, indexKey: string) => {
+    setEditingMetaIndex(indexKey);
+    setEditMetaChatCount(mc.chatCount || 0);
+    setEditMetaKondisi(mc.kondisi || '');
+  };
+
+  const handleSaveEditMeta = async (mc: MetaChat) => {
+    if (!onUpsertMetaChat) return;
+    try {
+      const success = await onUpsertMetaChat({
+        ...mc,
+        chatCount: editMetaChatCount,
+        kondisi: editMetaKondisi.trim(),
+      });
+      if (success) {
+        setEditingMetaIndex(null);
+        onShowToast('✅ Berhasil memperbarui target Meta Chat!');
+      }
+    } catch (err: any) {
+      onShowToast(`❌ Gagal memperbarui: ${err.message || err}`);
+    }
+  };
+
   const handleSaveMetaChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!metaDate) {
@@ -1149,7 +1211,328 @@ export const AdminView: React.FC<AdminViewProps> = ({
             </form>
           </div>
 
+          {/* INPUT DATA META CHATS */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+              <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
+                <Globe className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">
+                  Input Meta Chat (Target Masuk)
+                </h3>
+                <p className="text-[11px] text-slate-400 font-medium">
+                  Input data chat masuk Meta per tanggal untuk masing-masing CS
+                </p>
+              </div>
+            </div>
 
+            <form onSubmit={handleSaveMetaChat} className="space-y-3">
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Tanggal <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={metaDate}
+                  onChange={(e) => setMetaDate(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Pilih Petugas CS <span className="text-slate-400 font-semibold">(Wajib jika input target chat)</span>
+                </label>
+                <select
+                  value={metaCSName}
+                  onChange={(e) => setMetaCSName(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white cursor-pointer"
+                >
+                  <option value="">-- Pilih CS (Kosongkan jika hanya input Kondisi Hari) --</option>
+                  {csList.map((cs) => (
+                    <option key={cs.id} value={cs.nama}>
+                      👤 {cs.nama} ({cs.clientName || 'Global'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Jumlah Chat Masuk (Meta) <span className="text-slate-400 font-semibold">(Wajib jika petugas CS dipilih)</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={metaChatCount}
+                  onChange={(e) => setMetaChatCount(e.target.value)}
+                  placeholder="Contoh: 40"
+                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Kondisi Hari <span className="text-slate-400 font-semibold">(Opsional - e.g. "Iklan Mati", "Libur")</span>
+                </label>
+                <input
+                  type="text"
+                  value={metaKondisi}
+                  onChange={(e) => setMetaKondisi(e.target.value)}
+                  placeholder="Contoh: Iklan mati atau Libur"
+                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <button
+                  type="submit"
+                  disabled={isSavingMeta}
+                  className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold text-xs rounded-lg transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                >
+                  {isSavingMeta ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Check className="w-3.5 h-3.5" />
+                  )}
+                  <span>Simpan Target Meta Chat</span>
+                </button>
+                
+                {supabaseConfig.enabled && (
+                  <button
+                    type="button"
+                    onClick={handleSyncLocalMetaChatsToSupabase}
+                    disabled={isSavingMeta}
+                    className="py-2 px-3 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:bg-slate-300 text-white font-bold text-xs rounded-lg transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                    title={`Simpan & Sinkronkan ${metaChats.length} Data Lokal ke Supabase Cloud`}
+                  >
+                    <Database className="w-3.5 h-3.5 text-white" />
+                    <span>Simpan &amp; Sinkron ({metaChats.length} Data)</span>
+                  </button>
+                )}
+              </div>
+            </form>
+
+            {/* List of Entered Meta Chats */}
+            {metaChats && metaChats.length > 0 && (
+              <div className="pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">
+                    Riwayat Input Meta Chat &amp; Kondisi:
+                  </span>
+                  <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded">
+                    {filteredMetaChats.length === metaChats.length 
+                      ? `${metaChats.length} Data` 
+                      : `${filteredMetaChats.length} dari ${metaChats.length} Data`}
+                  </span>
+                </div>
+
+                {/* Filter Controls Row */}
+                <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200 mb-2.5 text-[10px]">
+                  <div>
+                    <span className="font-bold text-slate-500 block mb-0.5">Filter Tanggal:</span>
+                    <input
+                      type="date"
+                      value={filterMetaDate}
+                      onChange={(e) => {
+                        setFilterMetaDate(e.target.value);
+                        if (e.target.value) {
+                          setFilterMetaMonth('');
+                          setFilterMetaYear('');
+                        }
+                      }}
+                      className="w-full px-1.5 py-0.5 border border-slate-300 rounded bg-white text-xs font-semibold text-slate-800"
+                    />
+                  </div>
+
+                  <div>
+                    <span className="font-bold text-slate-500 block mb-0.5">Filter Bulan:</span>
+                    <select
+                      value={filterMetaMonth}
+                      onChange={(e) => {
+                        setFilterMetaMonth(e.target.value);
+                        if (e.target.value) {
+                          setFilterMetaDate('');
+                        }
+                      }}
+                      className="w-full px-1.5 py-0.5 border border-slate-300 rounded bg-white text-xs font-semibold text-slate-800"
+                    >
+                      <option value="">Semua Bulan</option>
+                      <option value="01">Januari</option>
+                      <option value="02">Februari</option>
+                      <option value="03">Maret</option>
+                      <option value="04">April</option>
+                      <option value="05">Mei</option>
+                      <option value="06">Juni</option>
+                      <option value="07">Juli</option>
+                      <option value="08">Agustus</option>
+                      <option value="09">September</option>
+                      <option value="10">Oktober</option>
+                      <option value="11">November</option>
+                      <option value="12">Desember</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <span className="font-bold text-slate-500 block mb-0.5">Filter Tahun:</span>
+                    <select
+                      value={filterMetaYear}
+                      onChange={(e) => {
+                        setFilterMetaYear(e.target.value);
+                        if (e.target.value) {
+                          setFilterMetaDate('');
+                        }
+                      }}
+                      className="w-full px-1.5 py-0.5 border border-slate-300 rounded bg-white text-xs font-semibold text-slate-800"
+                    >
+                      <option value="">Semua Tahun</option>
+                      {uniqueMetaYears.map((yr) => (
+                        <option key={yr} value={yr}>
+                          {yr}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Reset Filters Quick Button */}
+                {(filterMetaDate || filterMetaMonth || filterMetaYear) && (
+                  <div className="flex justify-end mb-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFilterMetaDate('');
+                        setFilterMetaMonth('');
+                        setFilterMetaYear('');
+                      }}
+                      className="text-[9px] font-bold text-red-600 hover:text-red-800 flex items-center gap-1 bg-red-50 hover:bg-red-100 border border-red-200 px-2 py-0.5 rounded cursor-pointer transition-colors"
+                    >
+                      ✕ Bersihkan Filter
+                    </button>
+                  </div>
+                )}
+
+                <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1 text-xs">
+                  {filteredMetaChats.length > 0 ? (
+                    filteredMetaChats.slice().sort((a, b) => b.tanggal.localeCompare(a.tanggal)).map((mc, idx) => {
+                      const uniqueKey = mc.id || `${mc.tanggal}_${mc.namaCS || 'Kondisi'}_${idx}`;
+                      const isEditing = editingMetaIndex === uniqueKey;
+
+                      return (
+                        <div
+                          key={uniqueKey}
+                          className={`p-2 border rounded transition-all flex flex-col gap-2 ${
+                            isEditing 
+                              ? 'bg-amber-50 border-amber-300 shadow-2xs' 
+                              : 'bg-slate-50 border-slate-200 hover:bg-emerald-50/50'
+                          }`}
+                        >
+                          {isEditing ? (
+                            /* Inline Edit Mode */
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 border-b border-slate-200 pb-1">
+                                <span className="text-amber-800 font-extrabold">EDIT INPUT META CHAT</span>
+                                <span>📅 {mc.tanggal} — {mc.namaCS || '📢 KONDISI'}</span>
+                              </div>
+                              
+                              {mc.namaCS && (
+                                <div>
+                                  <label className="block text-[9px] font-bold text-slate-400 uppercase mb-0.5">Jumlah Chat Masuk:</label>
+                                  <input
+                                    type="number"
+                                    value={editMetaChatCount}
+                                    onChange={(e) => setEditMetaChatCount(Number(e.target.value))}
+                                    className="w-full px-2 py-1 text-xs border border-slate-300 rounded font-mono font-bold text-slate-900 bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                  />
+                                </div>
+                              )}
+
+                              <div>
+                                <label className="block text-[9px] font-bold text-slate-400 uppercase mb-0.5">Kondisi Hari (Opsional):</label>
+                                <input
+                                  type="text"
+                                  value={editMetaKondisi}
+                                  onChange={(e) => setEditMetaKondisi(e.target.value)}
+                                  className="w-full px-2 py-1 text-xs border border-slate-300 rounded font-semibold text-slate-900 bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                  placeholder="e.g. Iklan Mati"
+                                />
+                              </div>
+
+                              <div className="flex justify-end gap-1.5 pt-1 border-t border-slate-150">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingMetaIndex(null)}
+                                  className="px-2 py-1 text-[10px] border border-slate-300 text-slate-600 rounded bg-white hover:bg-slate-100 font-semibold cursor-pointer"
+                                >
+                                  Batal
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveEditMeta(mc)}
+                                  className="px-2.5 py-1 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  Simpan
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            /* Display Mode */
+                            <div className="flex items-center justify-between">
+                              <div className="flex flex-col">
+                                <span className="font-bold text-emerald-800">
+                                  {mc.namaCS ? mc.namaCS : '📢 KONDISI HARI'}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                                  📅 {mc.tanggal}
+                                  {mc.namaCS && (
+                                    <> — <strong className="text-slate-700 font-extrabold">{mc.chatCount} Chats</strong></>
+                                  )}
+                                  {mc.kondisi && (
+                                    <span className="ml-1.5 bg-amber-100 text-amber-800 font-bold px-1 py-0.5 rounded text-[9px]">
+                                      📝 {mc.kondisi}
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {onUpsertMetaChat && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartEditMeta(mc, uniqueKey)}
+                                    className="p-1 text-slate-400 hover:text-amber-600 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                    title="Edit target/kondisi"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                                {onDeleteMetaChat && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onDeleteMetaChat(mc.tanggal, mc.namaCS)}
+                                    className="p-1 text-slate-400 hover:text-red-600 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                    title="Hapus Input"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="py-4 text-center text-slate-400 italic bg-slate-50 border border-slate-150 rounded">
+                      Tidak ada data Meta Chat yang sesuai dengan filter.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
         </div>
 
@@ -1389,162 +1772,6 @@ export const AdminView: React.FC<AdminViewProps> = ({
             </div>
           </div>
 
-
-
-          {/* INPUT DATA META CHATS */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-4">
-            <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-              <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg">
-                <Globe className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">
-                  Input Meta Chat (Target Masuk)
-                </h3>
-                <p className="text-[11px] text-slate-400 font-medium">
-                  Input data chat masuk Meta per tanggal untuk masing-masing CS
-                </p>
-              </div>
-            </div>
-
-            <form onSubmit={handleSaveMetaChat} className="space-y-3">
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                  Tanggal <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={metaDate}
-                  onChange={(e) => setMetaDate(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                  Pilih Petugas CS <span className="text-slate-400 font-semibold">(Wajib jika input target chat)</span>
-                </label>
-                <select
-                  value={metaCSName}
-                  onChange={(e) => setMetaCSName(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white cursor-pointer"
-                >
-                  <option value="">-- Pilih CS (Kosongkan jika hanya input Kondisi Hari) --</option>
-                  {csList.map((cs) => (
-                    <option key={cs.id} value={cs.nama}>
-                      👤 {cs.nama} ({cs.clientName || 'Global'})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                  Jumlah Chat Masuk (Meta) <span className="text-slate-400 font-semibold">(Wajib jika petugas CS dipilih)</span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={metaChatCount}
-                  onChange={(e) => setMetaChatCount(e.target.value)}
-                  placeholder="Contoh: 40"
-                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-bold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                  Kondisi Hari <span className="text-slate-400 font-semibold">(Opsional - e.g. "Iklan Mati", "Libur")</span>
-                </label>
-                <input
-                  type="text"
-                  value={metaKondisi}
-                  onChange={(e) => setMetaKondisi(e.target.value)}
-                  placeholder="Contoh: Iklan mati atau Libur"
-                  className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-500 focus:outline-none bg-white"
-                />
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                <button
-                  type="submit"
-                  disabled={isSavingMeta}
-                  className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-slate-300 text-white font-bold text-xs rounded-lg transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
-                >
-                  {isSavingMeta ? (
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Check className="w-3.5 h-3.5" />
-                  )}
-                  <span>Simpan Target Meta Chat</span>
-                </button>
-                
-                {supabaseConfig.enabled && (
-                  <button
-                    type="button"
-                    onClick={handleSyncLocalMetaChatsToSupabase}
-                    disabled={isSavingMeta}
-                    className="py-2 px-3 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:bg-slate-300 text-white font-bold text-xs rounded-lg transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
-                    title={`Simpan & Sinkronkan ${metaChats.length} Data Lokal ke Supabase Cloud`}
-                  >
-                    <Database className="w-3.5 h-3.5 text-white" />
-                    <span>Simpan &amp; Sinkron ({metaChats.length} Data)</span>
-                  </button>
-                )}
-              </div>
-            </form>
-
-            {/* List of Entered Meta Chats */}
-            {metaChats && metaChats.length > 0 && (
-              <div className="pt-2 border-t border-slate-100">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase">
-                    Riwayat Input Meta Chat &amp; Kondisi:
-                  </span>
-                  <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded">
-                    {metaChats.length} Data
-                  </span>
-                </div>
-
-                <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 text-xs">
-                  {metaChats.slice().sort((a, b) => b.tanggal.localeCompare(a.tanggal)).map((mc, idx) => (
-                    <div
-                      key={`${mc.tanggal}-${mc.namaCS || 'Kondisi'}-${idx}`}
-                      className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded font-medium text-slate-800 hover:bg-emerald-50/50 transition-all"
-                    >
-                      <div className="flex flex-col">
-                        <span className="font-bold text-emerald-800">
-                          {mc.namaCS ? mc.namaCS : '📢 KONDISI HARI'}
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                          📅 {mc.tanggal}
-                          {mc.namaCS && (
-                            <> — <strong className="text-slate-700 font-extrabold">{mc.chatCount} Chats</strong></>
-                          )}
-                          {mc.kondisi && (
-                            <span className="ml-1.5 bg-amber-100 text-amber-800 font-bold px-1 py-0.5 rounded text-[9px]">
-                              📝 {mc.kondisi}
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                      {onDeleteMetaChat && (
-                        <button
-                          type="button"
-                          onClick={() => onDeleteMetaChat(mc.tanggal, mc.namaCS)}
-                          className="p-1 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
-                          title="Hapus Input"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
 
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-4">
             <div className="flex items-center gap-2 pb-2 border-b border-slate-100">

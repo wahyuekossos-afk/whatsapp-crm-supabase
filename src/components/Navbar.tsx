@@ -260,15 +260,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               <Download className="w-3 h-3 text-green-600" />
               <span>Export .XLSX</span>
             </button>
-
-            <button
-              onClick={onResetData}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded text-slate-400 hover:text-red-600 hover:bg-slate-100 text-[11px] cursor-pointer"
-              title="Reset ke data contoh awal"
-            >
-              <RefreshCw className="w-3 h-3" />
-              <span>Reset</span>
-            </button>
           </div>
         </div>
       </div>
