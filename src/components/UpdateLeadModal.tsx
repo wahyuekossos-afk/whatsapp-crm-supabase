@@ -270,7 +270,7 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
       const newLog: RepeatOrderLog = {
         id: `ro-${Date.now()}`,
         timestamp: nowStr,
-        csName: currentCS.nama,
+        csName: namaCS.trim(),
         items: validItems,
         totalQuantity: calcCurrentRepeatQty,
         totalInvoice: calcCurrentRepeatInvoice,
@@ -305,7 +305,7 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
         {
           id: `h-${Date.now()}`,
           timestamp: nowStr,
-          csName: currentCS.nama,
+          csName: namaCS.trim(),
           fromFlow: lead.kategoriFlow,
           toFlow: kategoriFlow,
           note:
