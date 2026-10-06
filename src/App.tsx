@@ -1011,6 +1011,13 @@ export default function App() {
     const updated = leads.map((l) => (l.id === updatedLead.id ? updatedLead : l));
     setLeads(updated);
 
+    if (selectedLeadForHistory && selectedLeadForHistory.id === updatedLead.id) {
+      setSelectedLeadForHistory(updatedLead);
+    }
+    if (selectedLeadForEdit && selectedLeadForEdit.id === updatedLead.id) {
+      setSelectedLeadForEdit(updatedLead);
+    }
+
     let supabaseSuccess = true;
     let supabaseErrorMsg = '';
 

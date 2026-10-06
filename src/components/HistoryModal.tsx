@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Lead, RepeatOrderLog, CSUser, FlowCategory } from '../types';
 import { formatRupiah, formatHistoryTimestamp } from '../utils/spreadsheet';
 import { FLOW_CATEGORIES } from '../data/initialData';
-import { History, X, User, ArrowRight, Calendar, AlertTriangle, RotateCw, ShoppingBag, Edit3, Check } from 'lucide-react';
+import { History, X, User, ArrowRight, Calendar, AlertTriangle, RotateCw, ShoppingBag, Edit3, Check, Trash2 } from 'lucide-react';
 
 interface HistoryModalProps {
   lead: Lead | null;
@@ -145,6 +145,68 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
     onSave(updatedLead);
     setEditingRepeatId(null);
+  };
+
+  const handleDeleteHistoryItem = (itemId: string) => {
+    if (!onSave) return;
+    if (!window.confirm('Apakah Anda yakin ingin menghapus log riwayat ini?')) return;
+
+    const updatedHistory = (lead.history || []).filter((h) => h.id !== itemId);
+    const updatedLead: Lead = {
+      ...lead,
+      history: updatedHistory,
+    };
+
+    // If we deleted the latest history item, set the status to the new latest item's status
+    if (updatedHistory.length > 0) {
+      const newLatest = updatedHistory[updatedHistory.length - 1];
+      updatedLead.namaCS = newLatest.csName;
+      updatedLead.kategoriFlow = newLatest.toFlow;
+      if (newLatest.totalInvoice !== undefined) {
+        updatedLead.totalInvoice = newLatest.totalInvoice;
+      }
+      if (newLatest.quantityOrder !== undefined) {
+        updatedLead.quantityOrder = newLatest.quantityOrder;
+      }
+    }
+
+    onSave(updatedLead);
+  };
+
+  const handleDeleteRepeatLog = (logId: string) => {
+    if (!onSave) return;
+    if (!window.confirm('Apakah Anda yakin ingin menghapus data repeat order ini?')) return;
+
+    let repeatLogsList: RepeatOrderLog[] = [];
+    if (lead.riwayatRepeatOrder) {
+      try {
+        const parsed = JSON.parse(lead.riwayatRepeatOrder);
+        if (Array.isArray(parsed)) repeatLogsList = parsed;
+      } catch {
+        // ignore
+      }
+    }
+
+    if (repeatLogsList.length === 0) {
+      repeatLogsList = repeatLogs;
+    }
+
+    const logToDelete = repeatLogsList.find((l) => l.id === logId);
+    if (!logToDelete) return;
+
+    const deletedInvoice = logToDelete.totalInvoice || 0;
+    const deletedQty = logToDelete.totalQuantity || 0;
+
+    const updatedLogs = repeatLogsList.filter((l) => l.id !== logId);
+
+    const updatedLead: Lead = {
+      ...lead,
+      riwayatRepeatOrder: JSON.stringify(updatedLogs),
+      totalInvoice: Math.max(0, (lead.totalInvoice || 0) - deletedInvoice),
+      quantityOrder: Math.max(0, (lead.quantityOrder || 0) - deletedQty),
+    };
+
+    onSave(updatedLead);
   };
 
   let repeatLogs: RepeatOrderLog[] = [];
@@ -367,13 +429,22 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                           <div className="flex items-center gap-1.5">
                             <span>{formatHistoryTimestamp(item.timestamp, lead.tanggalMasuk, lead.jamMasuk)}</span>
                             {onSave && (
-                              <button
-                                onClick={() => startEditHistory(item)}
-                                className="text-slate-400 hover:text-indigo-600 p-0.5 rounded hover:bg-slate-100 cursor-pointer transition-colors"
-                                title="Edit log"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => startEditHistory(item)}
+                                  className="text-slate-400 hover:text-indigo-600 p-0.5 rounded hover:bg-slate-100 cursor-pointer transition-colors"
+                                  title="Edit log"
+                                >
+                                  <Edit3 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteHistoryItem(item.id)}
+                                  className="text-slate-400 hover:text-rose-600 p-0.5 rounded hover:bg-rose-50 cursor-pointer transition-colors"
+                                  title="Hapus log"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -521,13 +592,22 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                         <div className="flex items-center gap-1.5">
                           <span className="text-slate-500 font-mono text-[10px]">{log.timestamp}</span>
                           {onSave && (
-                            <button
-                              onClick={() => startEditRepeat(log)}
-                              className="text-slate-400 hover:text-teal-600 p-0.5 rounded hover:bg-slate-100 cursor-pointer transition-colors"
-                              title="Edit repeat order"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => startEditRepeat(log)}
+                                className="text-slate-400 hover:text-teal-600 p-0.5 rounded hover:bg-slate-100 cursor-pointer transition-colors"
+                                title="Edit repeat order"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteRepeatLog(log.id)}
+                                className="text-slate-400 hover:text-rose-600 p-0.5 rounded hover:bg-rose-50 cursor-pointer transition-colors"
+                                title="Hapus repeat order"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>
