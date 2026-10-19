@@ -27,7 +27,9 @@ import {
   Package,
   Plus,
   HardDrive,
-  Palette
+  Palette,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 interface AdminViewProps {
@@ -982,6 +984,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     <th className="px-3 py-2.5">Tugas Klien / Dasbor</th>
                     <th className="px-3 py-2.5">Role / Jabatan</th>
                     <th className="px-3 py-2.5 text-center">Total Handles</th>
+                    <th className="px-3 py-2.5 text-center">Status Summary Chat</th>
                     <th className="px-3 py-2.5 text-center">Aksi</th>
                   </tr>
                 </thead>
@@ -1061,6 +1064,47 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[11px]">
                             {totalLeadsByCS} leads
                           </span>
+                        </td>
+
+                        {/* Summary Chat Show / Hide Feature */}
+                        <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newHidden = !cs.isHidden;
+                              onUpdateCS({
+                                ...cs,
+                                isHidden: newHidden,
+                              });
+                              onShowToast(
+                                newHidden
+                                  ? `🙈 Status CS '${cs.nama}' diubah ke HIDE (disembunyikan dari Summary Chat).`
+                                  : `👁️ Status CS '${cs.nama}' diubah ke SHOW (ditampilkan di Summary Chat).`
+                              );
+                            }}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer shadow-3xs ${
+                              cs.isHidden
+                                ? 'bg-slate-100 text-slate-500 border border-slate-300 hover:bg-slate-200 hover:text-slate-700'
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800'
+                            }`}
+                            title={
+                              cs.isHidden
+                                ? `Status: HIDE (Tersembunyi di Summary Chat). Klik untuk SHOW (Tampilkan).`
+                                : `Status: SHOW (Tampil di Summary Chat). Klik untuk HIDE (Sembunyikan).`
+                            }
+                          >
+                            {cs.isHidden ? (
+                              <>
+                                <EyeOff className="w-3.5 h-3.5 text-slate-500" />
+                                <span>Hide</span>
+                              </>
+                            ) : (
+                              <>
+                                <Eye className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Show</span>
+                              </>
+                            )}
+                          </button>
                         </td>
 
                         <td className="px-3 py-2.5 text-center whitespace-nowrap">
@@ -1254,7 +1298,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     <option value="">-- Pilih CS (Kosongkan jika hanya input Kondisi) --</option>
                     {csList.map((cs) => (
                       <option key={cs.id} value={cs.nama}>
-                        👤 {cs.nama} ({cs.clientName || 'Global'})
+                        👤 {cs.nama} ({cs.clientName || 'Global'}){cs.isHidden ? ' [Status: Hide]' : ''}
                       </option>
                     ))}
                   </select>

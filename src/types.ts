@@ -95,6 +95,7 @@ export interface CSUser {
   role: string;
   avatar: string;
   clientName?: string; // Specific client dashboard name, or undefined/'Semua Klien' for global/all clients
+  isHidden?: boolean;  // When true, hidden from CS Performance Summary Chat
 }
 
 export interface FilterOptions {

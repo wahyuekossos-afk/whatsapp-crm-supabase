@@ -275,6 +275,12 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
     }
   }
 
+  // If lead was already Repeat Order but parsed logs was empty, the existing lead total is the baseline
+  if (lead?.kategoriFlow === 'Repeat Order' && latestLogOldInvoice === 0 && (lead.totalInvoice || 0) > 0) {
+    latestLogOldInvoice = lead.totalInvoice || 0;
+    latestLogOldQty = lead.quantityOrder || 0;
+  }
+
   const calcLifetimeInvoice =
     kategoriFlow === 'Repeat Order'
       ? isNewRepeat
@@ -451,9 +457,9 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
             updateLogNote ||
             ((namaCS !== lead.namaCS ? `Ubah CS dari ${lead.namaCS} ke ${namaCS}. ` : '') +
             (kategoriFlow === 'Repeat Order'
-              ? isNewRepeat
+              ? (isNewRepeat
                 ? `Repeat Order Baru (${calcCurrentRepeatQty} pcs, ${formatRupiah(calcCurrentRepeatInvoice)})`
-                : `Update Repeat Order Terakhir (${calcCurrentRepeatQty} pcs, ${formatRupiah(calcCurrentRepeatInvoice)})`
+                : `Update Repeat Order Terakhir (${calcCurrentRepeatQty} pcs, ${formatRupiah(calcCurrentRepeatInvoice)})`)
               : kategoriFlow === 'Progres Desaign'
               ? `${kategoriFlow} ${finalQuantityOrder} pcs, ${formatRupiah(finalTotalInvoice)} (Deadline: ${designDeadlineDays} hari)`
               : `Update status ke ${kategoriFlow}`)),
@@ -938,7 +944,7 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
           {/* Action Buttons Sticky Footer */}
           <div className="p-3 sm:p-4 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2.5 shrink-0 sticky bottom-0 z-10 shadow-xs">
             <span className="text-[10px] sm:text-[11px] text-slate-400 self-start sm:self-auto leading-none">
-              CS: <strong className="text-slate-600">{currentCS.nama}</strong>
+              CS Bertugas: <strong className="text-slate-700">{namaCS.trim() || currentCS.nama}</strong>
             </span>
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
               <button
@@ -953,26 +959,10 @@ export const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({
                 className={`px-5 py-2.5 sm:py-2 rounded-lg font-bold text-xs text-white shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer flex-1 sm:flex-initial ${
                   lead.isInstagram
                     ? 'bg-pink-600 hover:bg-pink-500 active:bg-pink-700 shadow-pink-600/20'
-                    : kategoriFlow === 'Repeat Order'
-                    ? isNewRepeat
-                      ? 'bg-teal-600 hover:bg-teal-500 active:bg-teal-700 shadow-teal-600/20'
-                      : 'bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 shadow-indigo-600/20'
                     : 'bg-slate-900 hover:bg-slate-800'
                 }`}
               >
-                {kategoriFlow === 'Repeat Order' ? (
-                  isNewRepeat ? (
-                    <>
-                      <RotateCw className="w-3.5 h-3.5" />
-                      <span>Simpan Repeat Order Baru</span>
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Update Repeat Order Terakhir</span>
-                    </>
-                  )
-                ) : lead.isInstagram ? (
+                {lead.isInstagram ? (
                   <>
                     <Instagram className="w-3.5 h-3.5" />
                     <span>Simpan Progress IG</span>

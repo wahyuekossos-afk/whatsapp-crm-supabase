@@ -587,6 +587,7 @@ export async function fetchGoogleSheetsLeads(
                   role: cs.Role || cs.role || 'CS Officer',
                   clientName: cs['Tugas Klien'] || cs.clientName || cs.namaKlien || undefined,
                   avatar: cs['Avatar URL'] || cs.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+                  isHidden: cs.isHidden === true || cs.is_hidden === true || cs['Status'] === 'Hide' || cs['Status'] === 'hide' || false,
                 }));
             }
             if (Array.isArray(data.kpiTargets)) {

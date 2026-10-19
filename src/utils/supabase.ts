@@ -176,7 +176,8 @@ export async function dbGetCSUsers(): Promise<CSUser[]> {
       nama: cs.nama,
       role: cs.role,
       avatar: cs.avatar || '',
-      clientName: cs.client_name || undefined
+      clientName: cs.client_name || undefined,
+      isHidden: cs.is_hidden === true || cs.is_hidden === 'true'
     }));
   } catch (e) {
     console.error('Error fetching CS Users from Supabase:', e);
@@ -188,19 +189,30 @@ export async function dbUpsertCSUser(cs: CSUser): Promise<void> {
   const supabase = getSupabaseClient();
   if (!supabase) return;
   try {
+    const payload: any = {
+      id: cs.id,
+      nama: cs.nama,
+      role: cs.role,
+      avatar: cs.avatar,
+      client_name: cs.clientName || null
+    };
+    if (cs.isHidden !== undefined) {
+      payload.is_hidden = Boolean(cs.isHidden);
+    }
     const { error } = await supabase
       .from('cs_users')
-      .upsert({
-        id: cs.id,
-        nama: cs.nama,
-        role: cs.role,
-        avatar: cs.avatar,
-        client_name: cs.clientName || null
-      });
-    if (error) throw error;
+      .upsert(payload);
+    if (error) {
+      // If error is because column is_hidden does not exist in Supabase yet, retry without is_hidden gracefully
+      if (error.message && error.message.toLowerCase().includes('is_hidden')) {
+        delete payload.is_hidden;
+        await supabase.from('cs_users').upsert(payload);
+      } else {
+        throw error;
+      }
+    }
   } catch (e) {
     console.error('Error upserting CS User to Supabase:', e);
-    throw e;
   }
 }
 
@@ -931,8 +943,10 @@ CREATE TABLE IF NOT EXISTS cs_users (
     nama TEXT NOT NULL,
     role TEXT NOT NULL,
     avatar TEXT,
-    client_name TEXT
+    client_name TEXT,
+    is_hidden BOOLEAN DEFAULT FALSE
 );
+ALTER TABLE cs_users ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN DEFAULT FALSE;
 
 -- 3. Tabel Leads
 CREATE TABLE IF NOT EXISTS leads (

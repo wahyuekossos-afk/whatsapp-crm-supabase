@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Lead, CSUser, MetaChat } from '../types';
 import { FLOW_CATEGORIES } from '../data/initialData';
 import { formatRupiah, calculateResponseMinutes, formatResponseTime } from '../utils/spreadsheet';
@@ -20,7 +20,9 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
-  Sparkles
+  Sparkles,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -56,9 +58,22 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
   const [showCRMDetails, setShowCRMDetails] = useState(false);
   const [hiddenCSNames, setHiddenCSNames] = useState<string[]>([]);
 
+  // CS officers hidden via Admin Management
+  const adminHiddenCSList = useMemo(() => {
+    return csList.filter((cs) => cs.isHidden);
+  }, [csList]);
+
+  // Visible CS officers in Summary Chat: must NOT be hidden in Admin Management and NOT hidden in view
   const visibleCSList = useMemo(() => {
-    return csList.filter((cs) => !hiddenCSNames.includes(cs.nama));
+    return csList.filter((cs) => !cs.isHidden && !hiddenCSNames.includes(cs.nama));
   }, [csList, hiddenCSNames]);
+
+  // Reset CS filter if selected CS becomes hidden
+  useEffect(() => {
+    if (summaryCSFilter && !visibleCSList.some((cs) => cs.nama === summaryCSFilter)) {
+      setSummaryCSFilter('');
+    }
+  }, [summaryCSFilter, visibleCSList]);
 
   // --- LEADERBOARD LOGIC & CALCULATIONS ---
   const csStats = useMemo(() => {
@@ -216,7 +231,7 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
 
   const summaryData = useMemo(() => {
     return allDates.map((date) => {
-      const csData = csList.map((cs) => {
+      const csData = visibleCSList.map((cs) => {
         // Count actual leads generated in CRM (Supabase)
         const csLeadCount = leads.filter(
           (l) => l.namaCS === cs.nama && l.tanggalMasuk === date
@@ -245,11 +260,11 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
         };
       });
 
-      // A date row is flagged as mismatch (red date) only if at least one CS is under performing (isUnder)
+      // A date row is flagged as mismatch (red date) only if at least one visible CS is under performing (isUnder)
       const anyMismatch = csData.some((cd) => cd.isUnder);
 
-      // Extract condition that belongs to active CS, or fallback to a general condition on that date
-      const activeCSNames = csList.map((cs) => cs.nama);
+      // Extract condition that belongs to active visible CS, or fallback to a general condition on that date
+      const activeCSNames = visibleCSList.map((cs) => cs.nama);
       const activeCSCondEntry = metaChats.find(
         (m) => m.tanggal === date && m.kondisi && m.namaCS && activeCSNames.includes(m.namaCS)
       );
@@ -263,7 +278,7 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
         kondisi
       };
     });
-  }, [allDates, csList, leads, metaChats]);
+  }, [allDates, visibleCSList, leads, metaChats]);
 
   // Apply UI filters to summary data
   const filteredSummary = useMemo(() => {
@@ -795,8 +810,8 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
                     onChange={(e) => setSummaryCSFilter(e.target.value)}
                     className="px-2 py-1.5 text-xs border border-slate-300 rounded font-semibold text-slate-700 bg-white cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   >
-                    <option value="">-- Semua Petugas CS --</option>
-                    {csList.map((cs) => (
+                    <option value="">-- Semua Petugas CS ({visibleCSList.length}) --</option>
+                    {visibleCSList.map((cs) => (
                       <option key={cs.id} value={cs.nama}>
                         👤 {cs.nama}
                       </option>
@@ -811,7 +826,8 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
                     checked={mismatchOnly}
                     onChange={(e) => setMismatchOnly(e.target.checked)}
                     className="w-4 h-4 border-slate-300 rounded text-red-600 focus:ring-red-500 cursor-pointer"
-                  />
+                  >
+                  </input>
                   <span>⚠️ Hanya Tampilkan Tanggal Tidak Sesuai</span>
                 </label>
               </div>
@@ -831,10 +847,32 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
               )}
             </div>
 
-            {/* Restorable Hidden CS list */}
+            {/* Admin Management Hidden CS notification */}
+            {adminHiddenCSList.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs mt-3">
+                <span className="font-bold text-slate-500 flex items-center gap-1.5">
+                  <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Petugas CS di-Hide via Admin Management ({adminHiddenCSList.length}):</span>
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {adminHiddenCSList.map((cs) => (
+                    <span
+                      key={cs.id}
+                      className="inline-flex items-center gap-1 bg-white text-slate-600 border border-slate-200 px-2 py-0.5 rounded-full text-[10px] font-bold shadow-3xs"
+                    >
+                      <span className="text-slate-400 font-normal">👤</span>
+                      <span>{cs.nama}</span>
+                      <span className="text-[9px] bg-slate-100 text-slate-500 px-1 rounded font-medium">Hide</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Restorable Hidden CS list (hidden within summary chat column action) */}
             {hiddenCSNames.length > 0 && (
               <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-xs mt-3">
-                <span className="font-bold text-slate-500">CS Tersembunyi ({hiddenCSNames.length}):</span>
+                <span className="font-bold text-slate-500">CS Disembunyikan Sementara ({hiddenCSNames.length}):</span>
                 <div className="flex flex-wrap gap-1.5">
                   {hiddenCSNames.map((name) => (
                     <button
@@ -884,7 +922,19 @@ export const CSPerformanceView: React.FC<CSPerformanceViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredSummary.length > 0 ? (
+                  {visibleCSList.length === 0 ? (
+                    <tr>
+                      <td colSpan={2} className="p-10 text-center text-slate-500 text-xs">
+                        <div className="flex flex-col items-center gap-2">
+                          <EyeOff className="w-8 h-8 text-slate-400" />
+                          <span className="font-bold text-slate-700 text-sm">Semua Petugas CS Sedang di-Hide</span>
+                          <span className="text-slate-500 max-w-md">
+                            Tidak ada petugas CS yang tampil di Summary Chat saat ini karena statusnya di-Hide. Buka menu <strong>Admin Management &gt; Daftar Petugas CS</strong> dan klik tombol <strong>Show</strong> untuk menampilkannya kembali.
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : filteredSummary.length > 0 ? (
                     filteredSummary.map((row) => (
                       <tr key={row.date} className="hover:bg-slate-50/50 transition-colors">
                         {/* TANGGAL CELL: Colored red if mismatch occurs in this date */}
